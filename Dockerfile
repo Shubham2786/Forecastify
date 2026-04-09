@@ -19,12 +19,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy necessary files for the standalone build
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app .
 
 EXPOSE 3000
 
-# Distroless uses node as entrypoint, so just pass the server file
-CMD ["server.js"]
+CMD ["node_modules/.bin/next", "start"]
