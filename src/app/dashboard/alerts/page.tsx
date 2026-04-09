@@ -50,6 +50,8 @@ export default function AlertsPage() {
   const [filter, setFilter] = useState("all");
   const [generatedAt, setGeneratedAt] = useState("");
   const [weather, setWeather] = useState<any>(null);
+  const [weatherLoaded, setWeatherLoaded] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
   // Fetch weather
   useEffect(() => {
@@ -59,6 +61,7 @@ export default function AlertsPage() {
         const res = await fetch(`/api/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
         if (res.ok) { const d = await res.json(); setWeather(d.current); }
       } catch {}
+      setWeatherLoaded(true);
     })();
   }, []);
 
@@ -80,8 +83,13 @@ export default function AlertsPage() {
     } catch {} finally { setLoading(false); }
   };
 
-  // Auto-fetch on mount
-  useEffect(() => { if (user) fetchAlerts(); }, [user, weather]);
+  // Fetch once after weather is loaded
+  useEffect(() => {
+    if (user && weatherLoaded && !hasFetched) {
+      setHasFetched(true);
+      fetchAlerts();
+    }
+  }, [user, weatherLoaded, hasFetched]);
 
   const filtered = filter === "all" ? alerts : alerts.filter(a => a.severity === filter);
 

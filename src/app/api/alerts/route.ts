@@ -14,7 +14,7 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { userId, weather, location } = await request.json();
+    const { userId, weather } = await request.json();
     if (!userId) return Response.json({ error: "userId required" }, { status: 400 });
 
     // Fetch inventory
@@ -126,6 +126,12 @@ Only include products that actually need alerts. Be realistic. Max 15 alerts.`;
     return Response.json({ alerts, summary, generatedAt: new Date().toISOString() });
   } catch (err: any) {
     console.error("Alerts error:", err.message);
-    return Response.json({ error: err.message || "Failed to generate alerts" }, { status: 500 });
+    // Return empty alerts instead of 500 so page doesn't break
+    return Response.json({
+      alerts: [],
+      summary: { critical: 0, warning: 0, info: 0 },
+      error: err.message,
+      generatedAt: new Date().toISOString(),
+    });
   }
 }
