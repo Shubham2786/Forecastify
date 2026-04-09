@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-sns": "^3.1027.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.102.1",
     "groq-sdk": "^1.1.2",

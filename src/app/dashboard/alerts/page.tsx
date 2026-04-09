@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   AlertTriangle, ShieldAlert, Package, CheckCircle2, ChevronDown, ChevronUp,
   TrendingUp, TrendingDown, Loader2, RefreshCw, ArrowUpRight, Clock, Zap,
-  Minus,
+  Minus, Mail, Send,
 } from "lucide-react";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -52,14 +52,21 @@ export default function AlertsPage() {
   const [weather, setWeather] = useState<any>(null);
   const [weatherLoaded, setWeatherLoaded] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [location, setLocation] = useState("");
 
-  // Fetch weather
+  // Fetch weather + location
   useEffect(() => {
     (async () => {
       try {
         const pos = await new Promise<GeolocationPosition>((r, j) => navigator.geolocation.getCurrentPosition(r, j, { timeout: 10000 }));
-        const res = await fetch(`/api/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
-        if (res.ok) { const d = await res.json(); setWeather(d.current); }
+        const [wRes, lRes] = await Promise.all([
+          fetch(`/api/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`),
+          fetch(`/api/location?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`),
+        ]);
+        if (wRes.ok) { const d = await wRes.json(); setWeather(d.current); }
+        if (lRes.ok) { const d = await lRes.json(); setLocation(d.formattedAddress || d.city || ""); }
       } catch {}
       setWeatherLoaded(true);
     })();
@@ -68,6 +75,7 @@ export default function AlertsPage() {
   const fetchAlerts = async () => {
     if (!user) return;
     setLoading(true);
+    setEmailSent(false);
     try {
       const res = await fetch("/api/alerts", {
         method: "POST",
@@ -81,6 +89,21 @@ export default function AlertsPage() {
         setGeneratedAt(data.generatedAt);
       }
     } catch {} finally { setLoading(false); }
+  };
+
+  const sendAlertEmail = async () => {
+    if (!alerts.length) return;
+    setSending(true);
+    try {
+      const storeName = user?.user_metadata?.store_name || "Store";
+      const res = await fetch("/api/send-alert-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alerts, storeName, location }),
+      });
+      const data = await res.json();
+      if (data.sent) setEmailSent(true);
+    } catch {} finally { setSending(false); }
   };
 
   // Fetch once after weather is loaded
@@ -125,6 +148,15 @@ export default function AlertsPage() {
         </div>
         <div className="flex items-center gap-2">
           {generatedAt && <span className="text-[10px] text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(generatedAt).toLocaleTimeString("en-IN")}</span>}
+          {alerts.length > 0 && (
+            <button onClick={sendAlertEmail} disabled={sending || emailSent}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                emailSent ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600 hover:bg-red-500/20"
+              } disabled:opacity-50`}>
+              {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : emailSent ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />}
+              {sending ? "Sending..." : emailSent ? "Email Sent" : "Email Alerts"}
+            </button>
+          )}
           <button onClick={fetchAlerts} disabled={loading}
             className="p-2 rounded-lg bg-secondary hover:bg-muted text-muted-foreground">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
