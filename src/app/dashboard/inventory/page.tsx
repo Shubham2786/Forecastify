@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, Search, TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, ArrowUpDown } from "lucide-react";
 import { inventoryData } from "@/lib/mock-data";
 
@@ -15,8 +15,21 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"daysOfStock" | "product">("daysOfStock");
+  const [customProducts, setCustomProducts] = useState<typeof inventoryData>([]);
 
-  const filtered = inventoryData
+  useEffect(() => {
+    const load = () => {
+      const stored = JSON.parse(localStorage.getItem("custom_products") || "[]");
+      setCustomProducts(stored);
+    };
+    load();
+    window.addEventListener("products_updated", load);
+    return () => window.removeEventListener("products_updated", load);
+  }, []);
+
+  const allProducts = [...inventoryData, ...customProducts];
+
+  const filtered = allProducts
     .filter((item) => {
       const matchesSearch = item.product.toLowerCase().includes(search.toLowerCase()) || item.sku.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === "all" || item.status === statusFilter;
@@ -25,10 +38,10 @@ export default function InventoryPage() {
     .sort((a, b) => sortBy === "daysOfStock" ? a.daysOfStock - b.daysOfStock : a.product.localeCompare(b.product));
 
   const summary = {
-    total: inventoryData.length,
-    critical: inventoryData.filter((i) => i.status === "critical").length,
-    low: inventoryData.filter((i) => i.status === "low").length,
-    overstock: inventoryData.filter((i) => i.status === "overstock").length,
+    total: allProducts.length,
+    critical: allProducts.filter((i) => i.status === "critical").length,
+    low: allProducts.filter((i) => i.status === "low").length,
+    overstock: allProducts.filter((i) => i.status === "overstock").length,
   };
 
   return (
