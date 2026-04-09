@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Package, TrendingUp, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X } from "lucide-react";
+import { BarChart3, LayoutDashboard, Package, TrendingUp, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X, Zap, Bot } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard/jarvis", label: "Jarvis AI", icon: Bot },
+  { href: "/dashboard/demand-analysis", label: "Demand Spikes", icon: Zap },
   { href: "/dashboard/forecasts", label: "Forecasts", icon: TrendingUp },
   { href: "/dashboard/inventory", label: "Inventory", icon: Package },
   { href: "/dashboard/alerts", label: "Alerts", icon: AlertTriangle },
