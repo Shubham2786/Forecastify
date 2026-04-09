@@ -167,6 +167,17 @@ export default function DemandAnalysisPage() {
       const newsData = await newsRes.json();
       if (newsRes.ok) setNews(newsData);
 
+      // Step 3.5: Fetch store inventory from Supabase
+      setStep("Loading your inventory data...");
+      let inventoryItems: any[] = [];
+      if (user) {
+        const { data: invData } = await supabase
+          .from("inventory")
+          .select("product_name, category, quantity, unit, price, min_stock, max_stock, sku, brand")
+          .eq("store_id", user.id);
+        inventoryItems = invData || [];
+      }
+
       // Step 4: Run AI analysis
       setStep("Running AI demand analysis with Groq...");
       const analysisRes = await fetch("/api/demand-analysis", {
@@ -181,6 +192,7 @@ export default function DemandAnalysisPage() {
           news: newsData,
           events: newsData?.events,
           location: locData?.formattedAddress || `${city}, ${state}`,
+          inventory: inventoryItems,
         }),
       });
       const analysisData = await analysisRes.json();

@@ -1,8 +1,50 @@
 "use client";
 
-import { useState } from "react";
-import { Package, Search, TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, ArrowUpDown } from "lucide-react";
-import { inventoryData } from "@/lib/mock-data";
+import { useState, useEffect } from "react";
+import { Package, Search, TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, ArrowUpDown, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+type Status = "critical" | "low" | "optimal" | "overstock";
+type Trend = "rising" | "falling" | "stable";
+
+interface InventoryItem {
+  id: number;
+  product: string;
+  sku: string;
+  category: string;
+  currentStock: number;
+  recommendedStock: number;
+  dailyDemand: number;
+  daysOfStock: number;
+  status: Status;
+  trend: Trend;
+}
+
+function transformItem(row: any): InventoryItem {
+  const quantity = row.quantity ?? 0;
+  const minStock = row.min_stock ?? 10;
+  const maxStock = row.max_stock ?? 1000;
+  const dailyDemand = Math.max(1, Math.round(quantity / 7));
+  const daysOfStock = dailyDemand > 0 ? parseFloat((quantity / dailyDemand).toFixed(1)) : 0;
+
+  let status: Status = "optimal";
+  if (quantity <= minStock * 0.5) status = "critical";
+  else if (quantity <= minStock) status = "low";
+  else if (quantity >= maxStock) status = "overstock";
+
+  return {
+    id: row.id,
+    product: row.product_name ?? "Unknown",
+    sku: row.sku ?? "—",
+    category: row.category ?? "General",
+    currentStock: quantity,
+    recommendedStock: maxStock,
+    dailyDemand,
+    daysOfStock,
+    status,
+    trend: "stable" as Trend,
+  };
+}
 
 const statusConfig = {
   critical: { label: "Critical", color: "bg-danger/10 text-danger border-danger/20", icon: AlertTriangle },
@@ -15,21 +57,60 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState<"daysOfStock" | "product">("daysOfStock");
+  const [inventoryData, setInventoryData] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchInventory() {
+      setLoading(true);
+      const { data, error: fetchError } = await supabase
+        .from("inventory")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (fetchError) {
+        setError(fetchError.message);
+      } else {
+        setInventoryData((data ?? []).map(transformItem));
+      }
+      setLoading(false);
+    }
+    fetchInventory();
+  }, []);
 
   const filtered = inventoryData
-    .filter((item) => {
+    .filter((item: InventoryItem) => {
       const matchesSearch = item.product.toLowerCase().includes(search.toLowerCase()) || item.sku.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === "all" || item.status === statusFilter;
       return matchesSearch && matchesStatus;
     })
-    .sort((a, b) => sortBy === "daysOfStock" ? a.daysOfStock - b.daysOfStock : a.product.localeCompare(b.product));
+    .sort((a: InventoryItem, b: InventoryItem) => sortBy === "daysOfStock" ? a.daysOfStock - b.daysOfStock : a.product.localeCompare(b.product));
 
   const summary = {
     total: inventoryData.length,
-    critical: inventoryData.filter((i) => i.status === "critical").length,
-    low: inventoryData.filter((i) => i.status === "low").length,
-    overstock: inventoryData.filter((i) => i.status === "overstock").length,
+    critical: inventoryData.filter((i: InventoryItem) => i.status === "critical").length,
+    low: inventoryData.filter((i: InventoryItem) => i.status === "low").length,
+    overstock: inventoryData.filter((i: InventoryItem) => i.status === "overstock").length,
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <span className="ml-3 text-muted-foreground">Loading inventory...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64 text-danger">
+        <AlertTriangle className="w-6 h-6 mr-2" />
+        Failed to load inventory: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
