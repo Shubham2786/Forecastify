@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Forecastify - AI-Powered Demand Forecasting",
+  title: "Forecastify - Smart Demand Forecasting",
   description: "Smart inventory management and demand forecasting for retail stores",
 };
 

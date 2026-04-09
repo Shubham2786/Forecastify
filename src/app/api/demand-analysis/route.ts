@@ -3,6 +3,7 @@ import Groq from "groq-sdk";
 const GROQ_KEYS = [
 
   process.env.GROQ_API_KEY_2!,
+  process.env.GROQ_API_KEY_3!,
 ].filter(Boolean);
 
 export async function POST(request: Request) {

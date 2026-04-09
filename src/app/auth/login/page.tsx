@@ -51,7 +51,7 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold tracking-tight">Forecastify</h1>
           </div>
           <h2 className="text-4xl xl:text-5xl font-bold leading-tight mb-6">
-            AI-Powered Demand
+            Smart Demand
             <br />
             Forecasting
           </h2>
@@ -61,7 +61,7 @@ export default function LoginPage() {
           </p>
           <div className="space-y-4">
             {[
-              { icon: TrendingUp, title: "7-Day Demand Predictions", desc: "Accurate forecasts using AI & external data" },
+              { icon: TrendingUp, title: "7-Day Demand Predictions", desc: "Accurate forecasts using weather & market data" },
               { icon: BarChart3, title: "Smart Inventory Levels", desc: "Avoid stockouts and overstocking automatically" },
               { icon: ShieldCheck, title: "Risk Alerts & Insights", desc: "Actionable alerts for at-risk products" },
             ].map((feature) => (

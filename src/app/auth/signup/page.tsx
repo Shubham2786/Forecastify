@@ -146,7 +146,7 @@ export default function SignupPage() {
           </div>
           <h2 className="text-3xl xl:text-4xl font-bold leading-tight mb-6">Set up your store<br />in minutes</h2>
           <p className="text-lg text-white/80 mb-10 max-w-sm">
-            Join hundreds of retailers using AI to optimize their inventory and boost profits.
+            Join hundreds of retailers optimizing their inventory and boosting profits.
           </p>
           <div className="space-y-4">
             <div className="flex items-center gap-4">

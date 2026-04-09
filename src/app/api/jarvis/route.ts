@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 const GROQ_KEYS = [
   process.env.GROQ_API_KEY!,
   process.env.GROQ_API_KEY_2!,
+  process.env.GROQ_API_KEY_3!,
 ].filter(Boolean);
 
 function getGroqClient(keyIndex = 0) {
@@ -49,8 +50,8 @@ async function searchProduct(storeId: string, query: string) {
   return { data, error };
 }
 
-async function addOrMergeProduct(item: InventoryItem) {
-  // Check if product with same name already exists for this store
+async function addProduct(item: InventoryItem) {
+  // Check if product with same name already exists
   const { data: existing } = await supabase
     .from("inventory")
     .select("*")
@@ -60,24 +61,8 @@ async function addOrMergeProduct(item: InventoryItem) {
     .single();
 
   if (existing) {
-    // Product exists — merge: add quantity, update price if provided
-    const updates: Record<string, unknown> = {
-      quantity: existing.quantity + (item.quantity || 0),
-      updated_at: new Date().toISOString(),
-    };
-    if (item.price && item.price !== existing.price) updates.price = item.price;
-    if (item.brand && !existing.brand) updates.brand = item.brand;
-    if (item.sku && !existing.sku) updates.sku = item.sku;
-    if (item.supplier && !existing.supplier) updates.supplier = item.supplier;
-    if (item.category && item.category !== existing.category) updates.category = item.category;
-
-    const { data, error } = await supabase
-      .from("inventory")
-      .update(updates)
-      .eq("id", existing.id)
-      .select()
-      .single();
-    return { data, error, merged: true, previousQty: existing.quantity };
+    // REJECT — product already exists, don't add duplicate
+    return { data: existing, error: null, duplicate: true };
   }
 
   // New product — insert
@@ -86,7 +71,7 @@ async function addOrMergeProduct(item: InventoryItem) {
     .insert(item)
     .select()
     .single();
-  return { data, error, merged: false };
+  return { data, error, duplicate: false };
 }
 
 async function updateProduct(id: string, updates: Partial<InventoryItem>) {
@@ -138,24 +123,30 @@ export async function POST(request: Request) {
     const systemPrompt = `You are JARVIS, Tony Stark's AI. Store: "${store?.store_name || "Store"}" (${store?.store_category || "Retail"}) at ${store?.city || ""}.
 ${weather ? `Weather: ${weather.temp}°C ${weather.description}` : ""}
 
-RULES: Reply 1-2 sentences MAX. Spoken aloud. Same language as user (Hindi/English/Hinglish).
-- Greeting: "Jarvis online, Sir." + ask "News, inventory, or trending products?"
-- Add product needs: name, quantity, price. Missing? Ask short. Category/unit: YOU decide. Never ask.
-- "sold/reduce/kam karo" → reduce action. "add" → add action.
-- Show data via list/popup actions, don't speak lists.
+RULES:
+- Reply 1-2 sentences MAX. Same language as user.
+- Greeting: "Jarvis online, Sir. News, inventory, or trending products?"
+- ALL DATA must go in POPUP action. NEVER print tables/lists/product details in your text response.
+- Your spoken text = short confirmation only. Data = popup.
+- Category/unit: YOU auto-decide. Never ask user.
+- Add needs: name, quantity, price. Missing? Ask short.
+- NEVER add a product that already exists. If it exists, say "already exists, use update."
+- "sold/reduce/kam karo/bech diya" → REDUCE. "add" new product only → ADD. "update price/quantity" → UPDATE. "delete/hatao" → DELETE.
 
 INVENTORY (${inventory.data?.length || 0}):
 ${inventoryContext}
 
 ACTIONS — wrap in <action>{...}</action>:
-ADD: <action>{"type":"add","product_name":"X","category":"Auto","quantity":10,"unit":"pcs","price":50}</action>
-REDUCE: <action>{"type":"reduce","product_name":"X","quantity":5}</action>
-UPDATE: <action>{"type":"update","id":"uuid","updates":{"price":60}}</action>
-DELETE: <action>{"type":"delete","id":"uuid"}</action>
+ADD new product: <action>{"type":"add","product_name":"X","category":"Auto","quantity":10,"unit":"pcs","price":50}</action>
+REDUCE qty: <action>{"type":"reduce","product_name":"X","quantity":5}</action>
+UPDATE fields: <action>{"type":"update","product_name":"X","updates":{"price":60,"quantity":100}}</action>
+DELETE: <action>{"type":"delete","product_name":"X"}</action>
 SEARCH: <action>{"type":"search","query":"X"}</action>
-LIST: <action>{"type":"list"}</action>
-OPEN: <action>{"type":"open_url","url":"https://..."}</action>
-POPUP: <action>{"type":"popup","title":"T","content":"HTML"}</action>`;
+LIST all: <action>{"type":"list"}</action>
+OPEN URL: <action>{"type":"open_url","url":"https://..."}</action>
+SHOW DATA POPUP: <action>{"type":"popup","title":"Title","content":"<table>...</table>"}</action>
+
+IMPORTANT: When showing weather/news/product info/any data — put it inside a POPUP with proper HTML table. Keep spoken reply to 1 sentence.`;
 
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: systemPrompt },
@@ -205,7 +196,6 @@ POPUP: <action>{"type":"popup","title":"T","content":"HTML"}</action>`;
 
           switch (action.type) {
             case "add": {
-              // Sanitize — only pass valid DB columns
               const item: InventoryItem = {
                 store_id: userId,
                 product_name: String(action.product_name || action.name || "Unknown"),
@@ -219,10 +209,14 @@ POPUP: <action>{"type":"popup","title":"T","content":"HTML"}</action>`;
                 min_stock: parseInt(String(action.min_stock || 10)),
                 max_stock: parseInt(String(action.max_stock || 1000)),
               };
-              console.log("JARVIS ADD - item:", JSON.stringify(item));
-              const result = await addOrMergeProduct(item);
-              console.log("JARVIS ADD - result:", JSON.stringify({ data: result.data?.product_name, error: result.error?.message, merged: result.merged }));
-              actions.push({ type: "add", result });
+              const result = await addProduct(item);
+              if (result.duplicate) {
+                // Product exists — tell Jarvis to inform user
+                response = `Sir, "${result.data.product_name}" already exists with ${result.data.quantity} ${result.data.unit} at ₹${result.data.price}. Say "update" to change it.`;
+                actions.push({ type: "duplicate", result });
+              } else {
+                actions.push({ type: "add", result });
+              }
               break;
             }
             case "reduce": {
@@ -245,13 +239,35 @@ POPUP: <action>{"type":"popup","title":"T","content":"HTML"}</action>`;
               break;
             }
             case "update": {
-              const result = await updateProduct(action.id, action.updates);
-              actions.push({ type: "update", result });
+              // Support both id and product_name lookup
+              let targetId = action.id;
+              if (!targetId && action.product_name) {
+                const { data: found } = await supabase.from("inventory").select("id").eq("store_id", userId)
+                  .ilike("product_name", `%${action.product_name}%`).limit(1).single();
+                targetId = found?.id;
+              }
+              if (targetId) {
+                const result = await updateProduct(targetId, action.updates);
+                actions.push({ type: "update", result });
+              } else {
+                actions.push({ type: "update", result: { error: "Product not found" } });
+              }
               break;
             }
             case "delete": {
-              const result = await deleteProduct(action.id);
-              actions.push({ type: "delete", result });
+              // Support both id and product_name lookup
+              let delId = action.id;
+              if (!delId && action.product_name) {
+                const { data: found } = await supabase.from("inventory").select("id").eq("store_id", userId)
+                  .ilike("product_name", `%${action.product_name}%`).limit(1).single();
+                delId = found?.id;
+              }
+              if (delId) {
+                const result = await deleteProduct(delId);
+                actions.push({ type: "delete", result });
+              } else {
+                actions.push({ type: "delete", result: { error: "Product not found" } });
+              }
               break;
             }
             case "search": {

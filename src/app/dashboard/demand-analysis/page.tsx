@@ -179,7 +179,7 @@ export default function DemandAnalysisPage() {
       }
 
       // Step 4: Run AI analysis
-      setStep("Running AI demand analysis with Groq...");
+      setStep("Generating demand predictions...");
       const analysisRes = await fetch("/api/demand-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -358,7 +358,7 @@ export default function DemandAnalysisPage() {
     <div class="cover-badge">Confidential Report</div>
   </div>
   <div class="cover-title">Demand Spike Analysis Report</div>
-  <div class="cover-sub">AI-Powered Retail Intelligence &middot; ${d.storeCategory}</div>
+  <div class="cover-sub">Retail Intelligence Report &middot; ${d.storeCategory}</div>
   <div class="cover-meta">
     <div class="cover-meta-item"><strong>Store:</strong> ${d.storeName}</div>
     <div class="cover-meta-item"><strong>Location:</strong> ${d.loc}</div>
@@ -411,8 +411,8 @@ ${analysis?.riskAlerts?.length ? `<div class="section">
 </div>` : ""}
 
 <div class="footer">
-  <div class="footer-left">Forecastify &middot; AI-Powered Demand Forecasting</div>
-  <div>&copy; ${new Date().getFullYear()} Forecastify. Confidential to ${d.storeName}. Powered by Groq AI.</div>
+  <div class="footer-left">Forecastify &middot; Smart Demand Forecasting</div>
+  <div>&copy; ${new Date().getFullYear()} Forecastify. Confidential to ${d.storeName}. Powered by Forecastify Intelligence.</div>
 </div>
 </body></html>`;
   };
@@ -487,7 +487,7 @@ ${analysis?.riskAlerts?.length ? `<div class="section">
     ${analysis?.inventoryRecommendations?.length ? `<div class="section"><div class="section-title">Inventory Recommendations</div><div class="grid-3">${d.inventoryCards}</div></div>` : ""}
     ${analysis?.riskAlerts?.length ? `<div class="section"><div class="section-title">Risk Alerts</div><div class="grid">${d.riskCards}</div></div>` : ""}
   </div>
-  <div class="footer">Forecastify &middot; AI-Powered Demand Forecasting &middot; &copy; ${new Date().getFullYear()} &middot; Powered by Groq AI</div>
+  <div class="footer">Forecastify &middot; Smart Demand Forecasting &middot; &copy; ${new Date().getFullYear()} &middot; Powered by Forecastify</div>
 </div>
 </body></html>`;
   };
@@ -534,7 +534,7 @@ ${analysis?.riskAlerts?.length ? `<div class="section">
             Demand Spike Analysis
           </h1>
           <p className="text-muted-foreground mt-1">
-            AI-powered demand prediction using real-time weather, events, and market data
+            Predict demand spikes using real-time weather, events, and market data
           </p>
         </div>
         <div className="flex gap-2">
@@ -608,7 +608,7 @@ ${analysis?.riskAlerts?.length ? `<div class="section">
             <p className="text-sm text-muted-foreground mt-1">This may take a few seconds...</p>
           </div>
           <div className="flex gap-2 mt-2">
-            {["Location", "Weather", "News", "AI Analysis"].map((s, i) => (
+            {["Location", "Weather", "News", "Analysis"].map((s, i) => (
               <div key={s} className={`px-3 py-1 rounded-full text-xs font-medium ${
                 step.toLowerCase().includes(s.toLowerCase().split(" ")[0].toLowerCase())
                   ? "bg-primary text-primary-foreground"
@@ -987,18 +987,81 @@ ${analysis?.riskAlerts?.length ? `<div class="section">
 
       {/* Empty state */}
       {!loading && !analysis && (
-        <div className="bg-card border border-border rounded-xl p-16 text-center">
-          <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center">
-            <Zap className="w-10 h-10 text-indigo-500" />
+        <div className="space-y-6">
+          {/* Hero */}
+          <div className="bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-pink-500/5 border border-indigo-500/20 rounded-2xl p-8 sm:p-12 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <Zap className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">Demand Spike Analysis</h2>
+            <p className="text-muted-foreground max-w-lg mx-auto mb-6">
+              Predict when your products will see the highest demand. Get 7-day forecasts based on weather, local events, festivals, and market trends — all tailored to your store.
+            </p>
+            <button onClick={runAnalysis} disabled={loading}
+              className="px-8 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 hover:shadow-lg hover:shadow-indigo-500/20 transition-all flex items-center gap-2 mx-auto">
+              <Zap className="w-4 h-4" /> Run Analysis Now
+            </button>
           </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">Ready to Analyze</h3>
-          <p className="text-muted-foreground max-w-md mx-auto mb-6">
-            Click &quot;Run Analysis&quot; to detect your location, fetch real-time weather and market data, and generate AI-powered demand predictions.
-          </p>
-          <div className="flex flex-wrap justify-center gap-3 text-xs text-muted-foreground">
-            {["Location Detection", "Weather Data", "Festival Calendar", "News & Offers", "AI Predictions"].map((f) => (
-              <span key={f} className="px-3 py-1.5 bg-secondary rounded-full">{f}</span>
-            ))}
+
+          {/* How it works */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-card border border-border rounded-xl p-5 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
+                <MapPin className="w-5 h-5 text-blue-500" />
+              </div>
+              <h4 className="font-semibold text-foreground text-sm mb-1">Store Location</h4>
+              <p className="text-xs text-muted-foreground">Detects your store address and fetches hyper-local data for your area</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-5 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center mb-3">
+                <Cloud className="w-5 h-5 text-orange-500" />
+              </div>
+              <h4 className="font-semibold text-foreground text-sm mb-1">Weather Forecast</h4>
+              <p className="text-xs text-muted-foreground">7-day weather data to predict how temperature and rain affect buying patterns</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-5 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-xl bg-pink-500/10 flex items-center justify-center mb-3">
+                <Calendar className="w-5 h-5 text-pink-500" />
+              </div>
+              <h4 className="font-semibold text-foreground text-sm mb-1">Events & Festivals</h4>
+              <p className="text-xs text-muted-foreground">Upcoming festivals, IPL matches, local events that drive demand spikes</p>
+            </div>
+            <div className="bg-card border border-border rounded-xl p-5 hover:shadow-md transition-shadow">
+              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center mb-3">
+                <TrendingUp className="w-5 h-5 text-green-500" />
+              </div>
+              <h4 className="font-semibold text-foreground text-sm mb-1">Smart Predictions</h4>
+              <p className="text-xs text-muted-foreground">Get spike probability, trending products, offers, and restock alerts for each day</p>
+            </div>
+          </div>
+
+          {/* What you get */}
+          <div className="bg-card border border-border rounded-xl p-6">
+            <h3 className="font-bold text-foreground mb-4">What you&apos;ll get in your report</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { icon: "📊", title: "7-Day Spike Forecast", desc: "Daily demand probability with spike percentage and top products" },
+                { icon: "🛒", title: "Trending Products", desc: "10+ products trending in your category with demand scores and prices" },
+                { icon: "🌦️", title: "Weather Impact", desc: "How current weather conditions will affect your sales this week" },
+                { icon: "🏷️", title: "Offers & Events", desc: "Upcoming festivals, promotions, and deals that impact your store" },
+                { icon: "📦", title: "Stock Recommendations", desc: "What to restock, reduce, or maintain based on predicted demand" },
+                { icon: "⚠️", title: "Risk Alerts", desc: "Stockout warnings, competition alerts, and spoilage risks" },
+              ].map(item => (
+                <div key={item.title} className="flex gap-3">
+                  <span className="text-xl">{item.icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Download note */}
+          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-red-500" /> Download as PDF</div>
+            <div className="flex items-center gap-2"><Code className="w-4 h-4 text-blue-500" /> Download as HTML</div>
           </div>
         </div>
       )}
