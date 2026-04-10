@@ -1,5 +1,6 @@
 pipeline {
     agent { label 'deploy' }
+    
 
     environment {
         SONARQUBE = credentials('sonar-token')
@@ -31,21 +32,10 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'env-file', variable: 'ENV_FILE')]) {
                     sh '''
+                    rm -f .env
                     cp $ENV_FILE .env
                     '''
                 }
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                sh 'npm ci'
-            }
-        }
-
-        stage('Build Application') {
-            steps {
-                sh 'npm run build'
             }
         }
 
