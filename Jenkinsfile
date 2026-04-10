@@ -1,10 +1,9 @@
 pipeline {
     agent { label 'deploy' }
 
-
-
     environment {
         SONARQUBE = credentials('sonar-token')
+        SCANNER_HOME = tool 'SonarScanner'
     }
 
     stages {
@@ -19,7 +18,7 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh '''
-                    sonar-scanner \
+                    ${SCANNER_HOME}/bin/sonar-scanner \
                     -Dsonar.projectKey=forecastify \
                     -Dsonar.sources=. \
                     -Dsonar.host.url=http://13.234.152.9:9000 \
@@ -52,8 +51,7 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh 'docker compose down || true'
-                sh 'docker compose up -d --build'
+                sh 'docker build -t forecastify .'
             }
         }
 
@@ -70,6 +68,13 @@ pipeline {
                     docker push $DOCKER_USER/forecastify:latest
                     '''
                 }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh 'docker compose down || true'
+                sh 'docker compose up -d'
             }
         }
     }
