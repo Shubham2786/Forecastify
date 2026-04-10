@@ -14,6 +14,8 @@ const pageTitles: Record<string, string> = {
   "/dashboard/category-analysis": "Category Analysis",
   "/dashboard/purchase-list": "Smart Purchase List",
   "/dashboard/market-insights": "Market Insights",
+  "/dashboard/what-if": "What-If Simulator",
+  "/dashboard/federated-intelligence": "Federated Intelligence",
   "/dashboard/model-accuracy": "AI Model Accuracy",
   "/dashboard/expiry-risk": "Expiry & Waste Risk",
   "/dashboard/inventory-health": "Inventory Health Score",

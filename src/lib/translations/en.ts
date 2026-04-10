@@ -7,6 +7,8 @@ const en: Record<string, string> = {
   "nav.categoryAnalysis": "Category Analysis",
   "nav.purchaseList": "Purchase List",
   "nav.marketInsights": "Market Insights",
+  "nav.whatIf": "What-If Simulator",
+  "nav.federated": "Peer Intelligence",
   "nav.modelAccuracy": "Model Accuracy",
   "nav.expiryRisk": "Expiry & Waste",
   "nav.inventoryHealth": "Health Score",

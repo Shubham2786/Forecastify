@@ -292,7 +292,7 @@ export async function POST(request: Request) {
       const cv = mean > 0 ? Math.round(Math.sqrt(variance) / mean * 100) : 0;
       return {
         name: name.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
-        avgSales: Math.round(mean * 10) / 10,
+        avgSales: Math.round(mean),
         volatility: cv,
         dataPoints: d.sales.length,
         level: cv > 40 ? "high" : cv > 20 ? "medium" : "low",
@@ -340,6 +340,41 @@ export async function POST(request: Request) {
       forecasts?.some(f => f.date === ti.date && f.product_id === ti.product_id)
     ).length || 0;
 
+    // Per-product 7-day forecast with min/max/current for the product selector chart
+    const perProductForecast: any[] = [];
+    const forecastByProduct: Record<number, { days: { day: string; date: string; predicted: number; recommended: number }[]; total: number }> = {};
+    forecasts?.forEach(f => {
+      if (!forecastByProduct[f.product_id]) forecastByProduct[f.product_id] = { days: [], total: 0 };
+      const d = new Date(f.date);
+      forecastByProduct[f.product_id].days.push({
+        day: dayNames[d.getDay()],
+        date: f.date,
+        predicted: Math.round(f.predicted_units_sold),
+        recommended: Math.round(f.recommended_inventory_level),
+      });
+      forecastByProduct[f.product_id].total += f.predicted_units_sold;
+    });
+    Object.entries(forecastByProduct).forEach(([pidStr, fData]) => {
+      const pid = Number(pidStr);
+      const p = productInfoMap[pid];
+      if (!p) return;
+      const inv = inventory?.find(i => i.product_name === p.product_name);
+      const dailyAvg = Math.round(fData.total / 7);
+      // Calculate min/max from forecast demand data
+      const minStock = Math.max(1, Math.round(dailyAvg * 3)); // 3 days safety stock
+      const maxStock = Math.max(minStock + 5, Math.round(dailyAvg * 14)); // 2 weeks max
+      fData.days.sort((a, b) => a.date.localeCompare(b.date));
+      perProductForecast.push({
+        name: p.product_name,
+        category: p.category || "",
+        currentStock: inv?.current_stock || 0,
+        unit: inv?.unit || "pcs",
+        minStock,
+        maxStock,
+        days: fData.days,
+      });
+    });
+
     return Response.json({
       store,
       stats: {
@@ -354,6 +389,7 @@ export async function POST(request: Request) {
         historicDataDays: salesData?.length || 0,
       },
       salesForecast: forecastVsHistoric,
+      perProductForecast,
       lastWeekData,
       categoryDemand,
       recentProducts,

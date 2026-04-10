@@ -55,12 +55,21 @@ export default function ProductAnalysisPage() {
     })();
   }, []);
 
-  // Search inventory for suggestions
+  // Search inventory + products catalog for suggestions
   const searchInventory = useCallback(async (q: string) => {
     if (!q.trim() || !user) { setSuggestions([]); return; }
-    const { data } = await supabase.from("inventory").select("product_name, category, current_stock, price, unit")
+    // Search user's inventory
+    const { data: invData } = await supabase.from("inventory").select("product_name, category, current_stock, price, unit")
       .eq("store_id", user.id).ilike("product_name", `%${q}%`).limit(5);
-    setSuggestions(data || []);
+    // Also search products catalog
+    const { data: catData } = await supabase.from("products").select("product_name, category, mrp")
+      .ilike("product_name", `%${q}%`).limit(5);
+
+    const invItems = (invData || []).map(i => ({ ...i, source: "inventory" }));
+    const catItems = (catData || []).filter(c => !invItems.some(i => i.product_name === c.product_name))
+      .map(c => ({ product_name: c.product_name, category: c.category, current_stock: 0, price: c.mrp, unit: "pcs", source: "catalog" }));
+
+    setSuggestions([...invItems, ...catItems].slice(0, 8));
   }, [user]);
 
   useEffect(() => {

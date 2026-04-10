@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Package, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X, Zap, Bot, Box, Plus, Tag, ShoppingCart, Megaphone, Target, Clock, Heart, Truck } from "lucide-react";
+import { LayoutDashboard, Package, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X, Zap, Bot, Box, Plus, Tag, ShoppingCart, Megaphone, Clock, FlaskConical } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/lang-context";
 import { supabase } from "@/lib/supabase";
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/dashboard/category-analysis", labelKey: "nav.categoryAnalysis", icon: Tag },
   { href: "/dashboard/purchase-list", labelKey: "nav.purchaseList", icon: ShoppingCart },
   { href: "/dashboard/market-insights", labelKey: "nav.marketInsights", icon: Megaphone },
+  { href: "/dashboard/what-if", labelKey: "nav.whatIf", icon: FlaskConical },
   { href: "/dashboard/inventory", labelKey: "nav.inventory", icon: Package },
   { href: "/dashboard/expiry-risk", labelKey: "nav.expiryRisk", icon: Clock },
   { href: "/dashboard/alerts", labelKey: "nav.alerts", icon: AlertTriangle },
