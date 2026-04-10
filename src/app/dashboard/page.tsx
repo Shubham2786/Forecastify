@@ -37,8 +37,6 @@ export default function DashboardPage() {
   const [promoCategory, setPromoCategory] = useState("");
   const [promoLoading, setPromoLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState("");
-  const [stockLevels, setStockLevels] = useState<any[]>([]);
-  const [stockLoading, setStockLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -58,25 +56,6 @@ export default function DashboardPage() {
       } catch {} finally { setLoading(false); }
     })();
   }, [user]);
-
-  // Fetch Groq-powered min/max stock levels after dashboard loads
-  useEffect(() => {
-    if (!data || !user) return;
-    setStockLoading(true);
-    (async () => {
-      try {
-        const res = await fetch("/api/product-stock-levels", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: user.id }),
-        });
-        if (res.ok) {
-          const d = await res.json();
-          if (d.products) setStockLevels(d.products);
-        }
-      } catch {} finally { setStockLoading(false); }
-    })();
-  }, [data, user]);
 
   // Auto-rotate promos through inventory categories every 1 hour
   useEffect(() => {
@@ -119,8 +98,8 @@ export default function DashboardPage() {
   const promoImpact = data?.promotionImpact || [];
   const dbWeather = data?.dbWeather || [];
   const matchedStore = data?.matchedStore;
-  // Use Groq-powered stock levels (min/max from AI, current from DB)
-  const selectedProd = stockLevels.find((p: any) => p.name === selectedProduct);
+  const perProductForecast = data?.perProductForecast || [];
+  const selectedProd = perProductForecast.find((p: any) => p.name === selectedProduct);
   const chartData = selectedProd
     ? selectedProd.days.map((d: any) => ({
         day: `${d.day} (${d.date.slice(5)})`,
@@ -398,11 +377,10 @@ ${events.length > 0 ? `<div class="section"><h2>Upcoming Events</h2>
             <select
               value={selectedProduct}
               onChange={(e) => setSelectedProduct(e.target.value)}
-              disabled={stockLoading}
               className="px-3 py-1.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50 max-w-55"
             >
-              <option value="">{stockLoading ? "Loading stock levels..." : `All Products (${s.forecastProductCount || 0})`}</option>
-              {stockLevels.map((p: any) => (
+              <option value="">All Products ({s.forecastProductCount || 0})</option>
+              {perProductForecast.map((p: any) => (
                 <option key={p.name} value={p.name}>{p.name} ({p.currentStock} {p.unit})</option>
               ))}
             </select>

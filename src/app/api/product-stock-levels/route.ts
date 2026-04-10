@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     next7.setDate(next7.getDate() + 7);
 
     // Find the matched store_id
-    const { data: stores } = await supabase.from("stores").select("store_id, city").eq("city", city).limit(1);
+    const { data: stores } = await supabase.from("stores").select("store_id, city").ilike("city", city).limit(1);
     const storeId = stores?.[0]?.store_id || 1;
 
     const { data: forecasts } = await supabase
