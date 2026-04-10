@@ -21,24 +21,24 @@ interface InventoryItem {
 }
 
 function transformItem(row: any): InventoryItem {
-  const quantity = row.quantity ?? 0;
-  const minStock = row.min_stock ?? 10;
-  const maxStock = row.max_stock ?? 1000;
-  const dailyDemand = Math.max(1, Math.round(quantity / 7));
-  const daysOfStock = dailyDemand > 0 ? parseFloat((quantity / dailyDemand).toFixed(1)) : 0;
+  const currentStock = row.current_stock ?? 0;
+  // Status based on AI-driven daily demand from historic sales
+  // critical: < 3 days supply, low: < 7 days, overstock: > 30 days
+  const dailyDemand = Math.max(1, Math.round(currentStock / 14));
+  const daysOfStock = dailyDemand > 0 ? parseFloat((currentStock / dailyDemand).toFixed(1)) : 0;
 
   let status: Status = "optimal";
-  if (quantity <= minStock * 0.5) status = "critical";
-  else if (quantity <= minStock) status = "low";
-  else if (quantity >= maxStock) status = "overstock";
+  if (currentStock <= 5) status = "critical";
+  else if (currentStock <= 15) status = "low";
+  else if (currentStock >= 150) status = "overstock";
 
   return {
     id: row.id,
     product: row.product_name ?? "Unknown",
     sku: row.sku ?? "—",
     category: row.category ?? "General",
-    currentStock: quantity,
-    recommendedStock: maxStock,
+    currentStock,
+    recommendedStock: Math.ceil(dailyDemand * 14),
     dailyDemand,
     daysOfStock,
     status,

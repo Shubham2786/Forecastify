@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     // 2. Inventory for this store
     const { data: inventory } = await supabase.from("inventory")
-      .select("product_name, category, quantity, unit, price, min_stock, max_stock")
+      .select("product_name, category, current_stock, unit, price")
       .eq("store_id", userId);
 
     // Map inventory by product name (lowercase)
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
       // Match inventory
       const inv = invMap[product.product_name.toLowerCase()];
-      const currentStock = inv?.quantity || 0;
+      const currentStock = inv?.current_stock || 0;
       const price = product.mrp || inv?.price || 0;
 
       // Build 7-day forecast
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
       let status: string;
       if (daysOfStock < 2) status = "critical";
       else if (daysOfStock < 5) status = "low";
-      else if (inv && currentStock >= (inv.max_stock || 1000) * 0.9) status = "overstock";
+      else if (inv && currentStock > inv.current_stock * 2) status = "overstock";
       else status = "optimal";
 
       // Trend

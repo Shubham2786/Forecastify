@@ -39,7 +39,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const emptyForm = { product: "", category: "Groceries", quantity: "", unit: "pcs", price: "", brand: "", sku: "", expiryDate: "" };
+  const emptyForm = { product: "", category: "Groceries", current_stock: "", unit: "pcs", price: "", brand: "", sku: "", expiryDate: "" };
   const [form, setForm] = useState(emptyForm);
 
   async function handleAddProduct(e: React.FormEvent) {
@@ -50,7 +50,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       store_id: user?.id,
       product_name: form.product,
       category: form.category,
-      quantity: Number(form.quantity),
+      current_stock: Number(form.current_stock),
       unit: form.unit,
       price: Number(form.price),
       brand: form.brand || null,
@@ -154,7 +154,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Quantity *</label>
-                  <input required type="number" min="0" placeholder="e.g. 100" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className={inputCls} />
+                  <input required type="number" min="0" placeholder="e.g. 100" value={form.current_stock} onChange={(e) => setForm({ ...form, current_stock: e.target.value })} className={inputCls} />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Unit *</label>

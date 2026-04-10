@@ -56,7 +56,7 @@ const en: Record<string, string> = {
   "table.topDemand": "Most Sold",
   "table.lowStock": "Low Stock",
   "table.highValue": "High Value",
-  "table.recent": "New Products",
+  "table.recentlyAdded": "Recently Added",
   "table.product": "Product",
   "table.category": "Category",
   "table.dailyDemand": "Daily Demand",

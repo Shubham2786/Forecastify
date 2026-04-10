@@ -100,7 +100,7 @@ export default function DashboardPage() {
   const testInputInfo = data?.testInputs || { total: 0, fulfilled: 0, pending: 0 };
 
   const filterData: Record<FilterTab, any[]> = { topDemand, lowStock, highValue, recent: recentProducts };
-  const filterLabels: Record<FilterTab, string> = { topDemand: t("table.topDemand"), lowStock: t("table.lowStock"), highValue: t("table.highValue"), recent: t("table.recent") };
+  const filterLabels: Record<FilterTab, string> = { topDemand: t("table.topDemand"), lowStock: t("table.lowStock"), highValue: t("table.highValue"), recent: t("table.recentlyAdded") };
 
   const genTime = data?.generatedAt ? new Date(data.generatedAt) : new Date();
   const timeStr = genTime.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });

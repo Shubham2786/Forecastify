@@ -20,15 +20,12 @@ interface InventoryItem {
   id?: string;
   product_name: string;
   category: string;
-  quantity: number;
+  current_stock: number;
   unit: string;
   price: number;
   sku?: string | null;
   brand?: string | null;
   supplier?: string | null;
-  min_stock?: number;
-  max_stock?: number;
-  expiry_date?: string | null;
   store_id: string;
 }
 
@@ -115,7 +112,7 @@ export async function POST(request: Request) {
     // Compact inventory: only name|qty|id (saves tokens for faster response)
     const inventoryContext = inventory.data?.length
       ? inventory.data.slice(0, 30).map((i: InventoryItem) =>
-          `${i.product_name}|${i.quantity}${i.unit}|₹${i.price}|${i.id}`
+          `${i.product_name}|${i.current_stock}${i.unit}|₹${i.price}|${i.id}`
         ).join("; ")
       : "Empty";
 
@@ -129,8 +126,8 @@ STOCK(${inventory.data?.length || 0}): ${inventoryContext}
 
 ACTIONS in <action>{JSON}</action>:
 Inventory: add/reduce/update/delete/search/list
-{"type":"add","product_name":"X","category":"Cat","quantity":10,"unit":"pcs","price":50}
-{"type":"reduce","product_name":"X","quantity":5}
+{"type":"add","product_name":"X","category":"Cat","current_stock":10,"unit":"pcs","price":50}
+{"type":"reduce","product_name":"X","current_stock":5}
 {"type":"update","product_name":"X","updates":{"price":60}}
 {"type":"delete","product_name":"X"}
 {"type":"search","query":"X"} | {"type":"list"}
@@ -198,18 +195,16 @@ For features: say "Running analysis, Sir." + action tag. Don't generate analysis
                 store_id: userId,
                 product_name: String(action.product_name || action.name || "Unknown"),
                 category: String(action.category || "General"),
-                quantity: parseInt(String(action.quantity)) || 1,
+                current_stock: parseInt(String(action.current_stock || action.quantity)) || 1,
                 unit: String(action.unit || "pcs"),
                 price: parseFloat(String(action.price)) || 0,
                 brand: action.brand ? String(action.brand) : null,
                 sku: action.sku ? String(action.sku) : null,
                 supplier: action.supplier ? String(action.supplier) : null,
-                min_stock: parseInt(String(action.min_stock || 10)),
-                max_stock: parseInt(String(action.max_stock || 1000)),
               };
               const result = await addProduct(item);
               if (result.duplicate) {
-                response = `Sir, "${result.data.product_name}" already exists with ${result.data.quantity} ${result.data.unit} at ₹${result.data.price}. Say "update" to change it.`;
+                response = `Sir, "${result.data.product_name}" already exists with ${result.data.current_stock} ${result.data.unit} at ₹${result.data.price}. Say "update" to change it.`;
                 actions.push({ type: "duplicate", result });
               } else {
                 actions.push({ type: "add", result });
@@ -221,9 +216,9 @@ For features: say "Running analysis, Sir." + action tag. Don't generate analysis
                 .from("inventory").select("*").eq("store_id", userId)
                 .ilike("product_name", `%${action.product_name}%`).limit(1).single();
               if (found) {
-                const newQty = Math.max(0, found.quantity - (action.quantity || 0));
-                const result = await updateProduct(found.id, { quantity: newQty });
-                actions.push({ type: "reduce", result: { ...result, previousQty: found.quantity, newQty } });
+                const newQty = Math.max(0, found.current_stock - (action.current_stock || action.quantity || 0));
+                const result = await updateProduct(found.id, { current_stock: newQty });
+                actions.push({ type: "reduce", result: { ...result, previousQty: found.current_stock, newQty } });
               } else {
                 actions.push({ type: "reduce", result: { error: "Product not found" } });
               }

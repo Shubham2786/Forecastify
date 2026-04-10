@@ -193,7 +193,7 @@ export default function JarvisPage() {
     if (!user) return [];
     const { createClient } = await import("@supabase/supabase-js");
     const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    const { data } = await sb.from("inventory").select("product_name, category, quantity, unit, price, min_stock, max_stock, brand, sku").eq("store_id", user.id);
+    const { data } = await sb.from("inventory").select("product_name, category, current_stock, unit, price, brand, sku").eq("store_id", user.id);
     return data || [];
   }, [user]);
 
@@ -1142,11 +1142,11 @@ export default function JarvisPage() {
                       {item.brand && <p className="text-muted-foreground text-[10px]">{item.brand}</p>}
                     </td>
                     <td className="px-3 py-2.5 text-muted-foreground">{item.category}</td>
-                    <td className="px-3 py-2.5 text-right font-bold text-foreground">{item.quantity} <span className="text-muted-foreground font-normal">{item.unit || "pcs"}</span></td>
+                    <td className="px-3 py-2.5 text-right font-bold text-foreground">{item.current_stock} <span className="text-muted-foreground font-normal">{item.unit || "pcs"}</span></td>
                     <td className="px-3 py-2.5 text-right text-foreground font-medium">₹{item.price}</td>
                     <td className="px-3 py-2.5 text-center">
                       <span className={`inline-block w-2 h-2 rounded-full ${
-                        item.quantity <= (item.min_stock || 10) ? "bg-red-500" : item.quantity >= (item.max_stock || 999) ? "bg-yellow-500" : "bg-green-500"
+                        item.current_stock <= 5 ? "bg-red-500" : item.current_stock >= 150 ? "bg-yellow-500" : "bg-green-500"
                       }`} />
                     </td>
                   </tr>

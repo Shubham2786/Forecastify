@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     // Build compact inventory context for the AI
     const inventoryContext = inventory?.length
       ? inventory.map((item: any) =>
-          `${item.product_name} | ${item.category} | Qty: ${item.quantity}${item.unit || "pcs"} | Min: ${item.min_stock ?? "?"} | Max: ${item.max_stock ?? "?"} | ₹${item.price}${item.brand ? ` | Brand: ${item.brand}` : ""}`
+          `${item.product_name} | ${item.category} | Stock: ${item.current_stock}${item.unit || "pcs"} | ₹${item.price}${item.brand ? ` | Brand: ${item.brand}` : ""}`
         ).join("\n")
       : "No inventory data available";
 

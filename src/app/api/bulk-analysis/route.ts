@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     // Full inventory
     const { data: inventory } = await supabase.from("inventory")
-      .select("product_name, category, quantity, unit, price").eq("store_id", userId);
+      .select("product_name, category, current_stock, unit, price").eq("store_id", userId);
 
     // Match each product to inventory (fuzzy)
     const invMatch: Record<string, any> = {};
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
 
     // Build compact context
     const invContext = Object.entries(invMatch).map(([name, inv]) =>
-      `${name}→${inv.product_name}:${inv.quantity}${inv.unit}@₹${inv.price}`
+      `${name}→${inv.product_name}:${inv.current_stock}${inv.unit}@₹${inv.price}`
     ).join(", ") || "No matches";
 
     const histContext = Object.entries(historicStats).map(([name, s]) =>
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
 
     const productList = products.map((p: ProductInput, i: number) => {
       const inv = invMatch[p.name];
-      return `${i + 1}. ${p.name}|${p.category}|want:${p.quantity || "?"}${p.unit || "pcs"}|₹${p.price || "?"}|inStock:${inv ? inv.quantity + inv.unit : "0"}`;
+      return `${i + 1}. ${p.name}|${p.category}|want:${p.current_stock || "?"}${p.unit || "pcs"}|₹${p.price || "?"}|inStock:${inv ? inv.current_stock + inv.unit : "0"}`;
     }).join("\n");
 
     const systemMsg = `You are a retail analyst for small Indian kirana stores. Return ONLY valid JSON. All quantities INTEGERS.

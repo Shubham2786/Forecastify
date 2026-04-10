@@ -15,8 +15,6 @@ interface Alert {
   category: string;
   currentStock: number;
   unit: string;
-  minStock: number;
-  maxStock: number;
   severity: "critical" | "warning" | "info";
   alertType: string;
   title: string;
@@ -181,7 +179,8 @@ export default function AlertsPage() {
             const demand = demandConfig[alert.demandLevel] || demandConfig.Medium;
             const DemandIcon = demand.icon;
             const isExpanded = expandedId === idx;
-            const stockPercent = alert.maxStock > 0 ? Math.round((alert.currentStock / alert.maxStock) * 100) : 0;
+            const safeStock = alert.estimatedDailyDemand * 14; // 14-day supply = 100%
+            const stockPercent = safeStock > 0 ? Math.round((alert.currentStock / safeStock) * 100) : 0;
 
             return (
               <div key={idx} className={`bg-card border rounded-2xl overflow-hidden transition-all ${config.border}`}>
@@ -221,7 +220,7 @@ export default function AlertsPage() {
                       <div className="bg-secondary/50 rounded-xl p-4">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs text-muted-foreground">Stock Level</span>
-                          <span className="text-xs font-semibold text-foreground">{alert.currentStock} / {alert.maxStock} {alert.unit}</span>
+                          <span className="text-xs font-semibold text-foreground">{alert.currentStock} {alert.unit} in stock</span>
                         </div>
                         <div className="w-full h-3 bg-secondary rounded-full overflow-hidden">
                           <div className={`h-full rounded-full transition-all ${
@@ -229,9 +228,9 @@ export default function AlertsPage() {
                           }`} style={{ width: `${Math.min(stockPercent, 100)}%` }} />
                         </div>
                         <div className="flex justify-between mt-1">
-                          <span className="text-[10px] text-muted-foreground">Min: {alert.minStock}</span>
-                          <span className="text-[10px] text-muted-foreground">{stockPercent}%</span>
-                          <span className="text-[10px] text-muted-foreground">Max: {alert.maxStock}</span>
+                          <span className="text-[10px] text-muted-foreground">0</span>
+                          <span className="text-[10px] text-muted-foreground">{stockPercent}% of 14-day supply</span>
+                          <span className="text-[10px] text-muted-foreground">{safeStock} {alert.unit}</span>
                         </div>
                       </div>
 
