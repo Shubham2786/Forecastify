@@ -58,7 +58,7 @@ export default function ProductAnalysisPage() {
   // Search inventory for suggestions
   const searchInventory = useCallback(async (q: string) => {
     if (!q.trim() || !user) { setSuggestions([]); return; }
-    const { data } = await supabase.from("inventory").select("product_name, category, quantity, price, unit")
+    const { data } = await supabase.from("inventory").select("product_name, category, current_stock, price, unit")
       .eq("store_id", user.id).ilike("product_name", `%${q}%`).limit(5);
     setSuggestions(data || []);
   }, [user]);
@@ -324,7 +324,7 @@ ${!forPrint ? "</div>" : ""}
                   <p className="text-xs text-muted-foreground">{s.category}</p>
                 </div>
                 <div className="text-right text-sm">
-                  <p className="font-semibold text-foreground">{s.quantity} {s.unit}</p>
+                  <p className="font-semibold text-foreground">{s.current_stock} {s.unit}</p>
                   <p className="text-xs text-muted-foreground">₹{s.price}</p>
                 </div>
               </button>
