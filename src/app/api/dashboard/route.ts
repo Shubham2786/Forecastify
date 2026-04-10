@@ -292,7 +292,7 @@ export async function POST(request: Request) {
       const cv = mean > 0 ? Math.round(Math.sqrt(variance) / mean * 100) : 0;
       return {
         name: name.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "),
-        avgSales: Math.round(mean * 10) / 10,
+        avgSales: Math.round(mean),
         volatility: cv,
         dataPoints: d.sales.length,
         level: cv > 40 ? "high" : cv > 20 ? "medium" : "low",

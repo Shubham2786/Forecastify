@@ -36,6 +36,9 @@ export default function DashboardPage() {
   const [promoResults, setPromoResults] = useState<any>(null);
   const [promoCategory, setPromoCategory] = useState("");
   const [promoLoading, setPromoLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState("");
+  const [stockLevels, setStockLevels] = useState<any[]>([]);
+  const [stockLoading, setStockLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -55,6 +58,25 @@ export default function DashboardPage() {
       } catch {} finally { setLoading(false); }
     })();
   }, [user]);
+
+  // Fetch Groq-powered min/max stock levels after dashboard loads
+  useEffect(() => {
+    if (!data || !user) return;
+    setStockLoading(true);
+    (async () => {
+      try {
+        const res = await fetch("/api/product-stock-levels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id }),
+        });
+        if (res.ok) {
+          const d = await res.json();
+          if (d.products) setStockLevels(d.products);
+        }
+      } catch {} finally { setStockLoading(false); }
+    })();
+  }, [data, user]);
 
   // Auto-rotate promos through inventory categories every 1 hour
   useEffect(() => {
@@ -97,6 +119,18 @@ export default function DashboardPage() {
   const promoImpact = data?.promotionImpact || [];
   const dbWeather = data?.dbWeather || [];
   const matchedStore = data?.matchedStore;
+  // Use Groq-powered stock levels (min/max from AI, current from DB)
+  const selectedProd = stockLevels.find((p: any) => p.name === selectedProduct);
+  const chartData = selectedProd
+    ? selectedProd.days.map((d: any) => ({
+        day: `${d.day} (${d.date.slice(5)})`,
+        predicted: d.predicted,
+        recommended: d.recommended,
+        minStock: selectedProd.minStock,
+        maxStock: selectedProd.maxStock,
+        currentStock: selectedProd.currentStock,
+      }))
+    : forecast;
   const testInputInfo = data?.testInputs || { total: 0, fulfilled: 0, pending: 0 };
 
   const filterData: Record<FilterTab, any[]> = { topDemand, lowStock, highValue, recent: recentProducts };
@@ -350,27 +384,61 @@ ${events.length > 0 ? `<div class="section"><h2>Upcoming Events</h2>
       {/* Forecast Chart + Category Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-card border border-border rounded-xl p-5">
-          <h3 className="font-semibold text-foreground flex items-center gap-2 mb-1">
-            <TrendingUp className="w-4 h-4 text-indigo-500" /> {t("chart.forecastTitle", { count: s.forecastProductCount || 0 })}
-          </h3>
-          <p className="text-xs text-muted-foreground mb-3">
-            {t("chart.forecastDesc")}
-          </p>
+          <div className="flex items-start justify-between mb-1 flex-wrap gap-2">
+            <div>
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-indigo-500" /> {selectedProduct ? `7-Day Forecast — ${selectedProduct}` : t("chart.forecastTitle", { count: s.forecastProductCount || 0 })}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {selectedProduct
+                  ? `Current: ${selectedProd?.currentStock || 0} ${selectedProd?.unit || "pcs"} | Min: ${selectedProd?.minStock || 0} | Max: ${selectedProd?.maxStock || 0}`
+                  : t("chart.forecastDesc")}
+              </p>
+            </div>
+            <select
+              value={selectedProduct}
+              onChange={(e) => setSelectedProduct(e.target.value)}
+              disabled={stockLoading}
+              className="px-3 py-1.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/50 max-w-55"
+            >
+              <option value="">{stockLoading ? "Loading stock levels..." : `All Products (${s.forecastProductCount || 0})`}</option>
+              {stockLevels.map((p: any) => (
+                <option key={p.name} value={p.name}>{p.name} ({p.currentStock} {p.unit})</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Product info badges when a product is selected */}
+          {selectedProd && (
+            <div className="flex flex-wrap items-center gap-2 mb-3 mt-2">
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-500">Current Stock: {selectedProd.currentStock} {selectedProd.unit}</span>
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-500">Min Stock: {selectedProd.minStock}</span>
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-green-500/10 text-green-500">Max Stock: {selectedProd.maxStock}</span>
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-secondary text-muted-foreground">{selectedProd.category}</span>
+            </div>
+          )}
+
           <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={forecast}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="gPred" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} /><stop offset="95%" stopColor="#6366f1" stopOpacity={0} /></linearGradient>
                 <linearGradient id="gActual" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} /><stop offset="95%" stopColor="#22c55e" stopOpacity={0} /></linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={12} />
+              <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={11} />
               <YAxis stroke="var(--color-muted-foreground)" fontSize={12} label={{ value: "units", angle: -90, position: "insideLeft", style: { fontSize: 10, fill: "var(--color-muted-foreground)" } }} />
               <Tooltip contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: "8px" }}
-                formatter={(v: any, name: any) => [v + " units", name === "predicted" ? "Forecast (agle hafte)" : name === "actual" ? "Pichle Hafte" : "Recommended Stock"]} />
-              <Legend formatter={(v) => v === "predicted" ? "Forecast" : v === "actual" ? "Last Week" : "Recommended"} />
+                formatter={(v: any, name: any) => [
+                  v + " units",
+                  name === "predicted" ? "Forecast" : name === "actual" ? "Last Week" : name === "recommended" ? "Recommended" : name === "minStock" ? "Min Stock" : name === "maxStock" ? "Max Stock" : name === "currentStock" ? "Current Stock" : name,
+                ]} />
+              <Legend formatter={(v) => v === "predicted" ? "Forecast" : v === "actual" ? "Last Week" : v === "recommended" ? "Recommended" : v === "minStock" ? "Min Stock" : v === "maxStock" ? "Max Stock" : v === "currentStock" ? "Current Stock" : v} />
               <Area type="monotone" dataKey="predicted" name="predicted" stroke="#6366f1" fill="url(#gPred)" strokeWidth={2} />
-              <Area type="monotone" dataKey="actual" name="actual" stroke="#22c55e" fill="url(#gActual)" strokeWidth={2} strokeDasharray="5 5" />
-              <Area type="monotone" dataKey="recommended" name="recommended" stroke="#f59e0b" fill="none" strokeWidth={1} strokeDasharray="3 3" />
+              {!selectedProduct && <Area type="monotone" dataKey="actual" name="actual" stroke="#22c55e" fill="url(#gActual)" strokeWidth={2} strokeDasharray="5 5" />}
+              <Area type="monotone" dataKey="recommended" name="recommended" stroke="#f59e0b" fill="none" strokeWidth={1.5} strokeDasharray="3 3" />
+              {selectedProduct && <Area type="monotone" dataKey="minStock" name="minStock" stroke="#ef4444" fill="none" strokeWidth={1.5} strokeDasharray="6 3" />}
+              {selectedProduct && <Area type="monotone" dataKey="maxStock" name="maxStock" stroke="#22c55e" fill="none" strokeWidth={1.5} strokeDasharray="6 3" />}
+              {selectedProduct && <Area type="monotone" dataKey="currentStock" name="currentStock" stroke="#3b82f6" fill="none" strokeWidth={2} />}
             </AreaChart>
           </ResponsiveContainer>
         </div>

@@ -24,7 +24,7 @@ function getNext7Days() {
 
 interface ProductInput {
   name: string; brand?: string; category: string;
-  quantity?: number; unit?: string; price?: number;
+  quantity?: number; current_stock?: number; unit?: string; price?: number;
 }
 
 export async function POST(request: Request) {
