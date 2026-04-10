@@ -139,8 +139,12 @@ export default function SignupPage() {
         </div>
         <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 text-white">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-              <BarChart3 className="w-7 h-7" />
+            <div className="w-12 h-12 bg-linear-to-br from-indigo-500 to-purple-600 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 20V14L7 10L11 13L17 6L21 10V20H3Z" fill="rgba(255,255,255,0.3)" />
+                <path d="M3 20L7 10L11 13L17 6L21 10" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="17" cy="6" r="2.5" fill="white" opacity="0.9" />
+              </svg>
             </div>
             <h1 className="text-3xl font-bold tracking-tight">Forecastify</h1>
           </div>
@@ -166,10 +170,14 @@ export default function SignupPage() {
       <div className="w-full lg:w-7/12 flex items-center justify-center p-6 sm:p-12 overflow-y-auto">
         <div className="w-full max-w-lg">
           <div className="lg:hidden flex items-center gap-3 mb-6 justify-center">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <BarChart3 className="w-6 h-6 text-primary-foreground" />
+            <div className="w-10 h-10 bg-linear-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 20V14L7 10L11 13L17 6L21 10V20H3Z" fill="rgba(255,255,255,0.3)" />
+                <path d="M3 20L7 10L11 13L17 6L21 10" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="17" cy="6" r="2.5" fill="white" opacity="0.9" />
+              </svg>
             </div>
-            <h1 className="text-2xl font-bold gradient-text">Forecastify</h1>
+            <h1 className="text-2xl font-bold bg-linear-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Forecastify</h1>
           </div>
 
           <div className="lg:hidden flex items-center justify-center gap-2 mb-6">

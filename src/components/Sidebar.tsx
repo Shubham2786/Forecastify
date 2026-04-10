@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Package, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X, Zap, Bot, Box, Plus, Tag, ShoppingCart } from "lucide-react";
+import { BarChart3, LayoutDashboard, Package, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X, Zap, Bot, Box, Plus, Tag, ShoppingCart, Megaphone, Target, Clock, Heart, Truck } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/lang-context";
 import { supabase } from "@/lib/supabase";
@@ -15,7 +15,9 @@ const navItems = [
   { href: "/dashboard/product-analysis", labelKey: "nav.productAnalysis", icon: Box },
   { href: "/dashboard/category-analysis", labelKey: "nav.categoryAnalysis", icon: Tag },
   { href: "/dashboard/purchase-list", labelKey: "nav.purchaseList", icon: ShoppingCart },
+  { href: "/dashboard/market-insights", labelKey: "nav.marketInsights", icon: Megaphone },
   { href: "/dashboard/inventory", labelKey: "nav.inventory", icon: Package },
+  { href: "/dashboard/expiry-risk", labelKey: "nav.expiryRisk", icon: Clock },
   { href: "/dashboard/alerts", labelKey: "nav.alerts", icon: AlertTriangle },
   { href: "/dashboard/settings", labelKey: "nav.settings", icon: Settings },
 ];
@@ -66,10 +68,14 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 h-16 border-b border-border shrink-0">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shrink-0">
-            <BarChart3 className="w-5 h-5 text-primary-foreground" />
+          <div className="w-9 h-9 bg-linear-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 20V14L7 10L11 13L17 6L21 10V20H3Z" fill="rgba(255,255,255,0.3)" />
+              <path d="M3 20L7 10L11 13L17 6L21 10" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="17" cy="6" r="2.5" fill="white" opacity="0.9" />
+            </svg>
           </div>
-          {!collapsed && <span className="text-lg font-bold gradient-text whitespace-nowrap">Forecastify</span>}
+          {!collapsed && <span className="text-lg font-bold whitespace-nowrap bg-linear-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">Forecastify</span>}
         </Link>
         <button onClick={onMobileClose} className="lg:hidden text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>
         <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:flex text-muted-foreground hover:text-foreground">

@@ -1,7 +1,9 @@
 const hi: Record<string, string> = {
   "nav.overview": "ओवरव्यू", "nav.jarvis": "जार्विस", "nav.demandSpikes": "डिमांड स्पाइक्स",
   "nav.productAnalysis": "प्रोडक्ट एनालिसिस", "nav.categoryAnalysis": "कैटेगरी एनालिसिस",
-  "nav.purchaseList": "खरीदारी लिस्ट", "nav.forecasts": "फोरकास्ट", "nav.inventory": "इन्वेंटरी",
+  "nav.purchaseList": "खरीदारी लिस्ट", "nav.marketInsights": "मार्केट इनसाइट्स",
+  "nav.modelAccuracy": "मॉडल एक्यूरेसी", "nav.expiryRisk": "एक्सपायरी रिस्क", "nav.inventoryHealth": "हेल्थ स्कोर", "nav.reorderPlanner": "रीऑर्डर प्लानर",
+  "nav.forecasts": "फोरकास्ट", "nav.inventory": "इन्वेंटरी",
   "nav.alerts": "अलर्ट", "nav.settings": "सेटिंग्स", "nav.signOut": "लॉग आउट", "nav.addProduct": "प्रोडक्ट जोड़ें",
 
   "stat.expectedSales": "अगले 7 दिन की बिक्री", "stat.vsLastWeek": "पिछले हफ्ते से {{val}}%",
