@@ -28,7 +28,15 @@ pipeline {
             }
         }
 
-    
+        stage('Inject Env File') {
+            steps {
+                withCredentials([file(credentialsId: 'env-file', variable: 'ENV_FILE')]) {
+                    sh '''
+                    cp $ENV_FILE .env
+                    '''
+                }
+            }
+        }
 
         stage('Install Dependencies') {
             steps {
