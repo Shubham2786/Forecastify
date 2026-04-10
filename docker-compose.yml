@@ -1,10 +1,9 @@
 services:
   forecastify:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ashok28072005/forecastify:latest
     ports:
       - "3000:3000"
     env_file:
       - .env
     restart: unless-stopped
+
