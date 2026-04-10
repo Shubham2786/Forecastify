@@ -14,9 +14,24 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { category, userId, weather, location } = await request.json();
-    if (!category || !userId) {
-      return Response.json({ error: "category and userId required" }, { status: 400 });
+    const { category: rawCategory, userId, weather, location, lang } = await request.json();
+    const langMap: Record<string, string> = { hi: "Hindi", mr: "Marathi", ta: "Tamil", te: "Telugu", kn: "Kannada", bn: "Bengali", gu: "Gujarati" };
+    const langInstruction = lang && langMap[lang] ? `\nIMPORTANT: Write summary, reason, recommendations, competitorInsight, seasonalTrend in ${langMap[lang]}. Keep product/brand names, numbers, JSON keys in English.` : "";
+    if (!userId) {
+      return Response.json({ error: "userId required" }, { status: 400 });
+    }
+
+    // If no category given, pick the top category from inventory
+    let category = rawCategory;
+    if (!category) {
+      const { data: inv } = await supabase.from("inventory").select("category").eq("store_id", userId);
+      if (inv?.length) {
+        const catCount: Record<string, number> = {};
+        inv.forEach(i => { catCount[i.category] = (catCount[i.category] || 0) + 1; });
+        category = Object.entries(catCount).sort((a, b) => b[1] - a[1])[0][0];
+      } else {
+        category = "Beverages";
+      }
     }
 
     // Store profile
@@ -127,7 +142,7 @@ JSON ONLY:
   "competitorInsight": "What competitors stock in this category"
 }
 
-Include 6-8 top brands and 10-15 products. Mark which ones are in my inventory. Be realistic with ${city} market data. Use historic averages where available.`;
+Include 6-8 top brands and 10-15 products. Mark which ones are in my inventory. Be realistic with ${city} market data. Use historic averages where available.${langInstruction}`;
 
     let completion: any = null;
     for (let i = 0; i < GROQ_KEYS.length; i++) {

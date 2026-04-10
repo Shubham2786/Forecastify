@@ -3,21 +3,23 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Package, TrendingUp, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X, Zap, Bot, Box, Plus, Tag, ShoppingCart } from "lucide-react";
+import { BarChart3, LayoutDashboard, Package, TrendingUp, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X, Zap, Bot, Box, Plus, Tag, ShoppingCart, Globe } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useLang } from "@/lib/lang-context";
+import { LANGUAGES } from "@/lib/translations";
 import { supabase } from "@/lib/supabase";
 
 const navItems = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/jarvis", label: "Jarvis", icon: Bot },
-  { href: "/dashboard/demand-analysis", label: "Demand Spikes", icon: Zap },
-  { href: "/dashboard/product-analysis", label: "Product Analysis", icon: Box },
-  { href: "/dashboard/category-analysis", label: "Category Analysis", icon: Tag },
-  { href: "/dashboard/purchase-list", label: "Purchase List", icon: ShoppingCart },
-  { href: "/dashboard/forecasts", label: "Forecasts", icon: TrendingUp },
-  { href: "/dashboard/inventory", label: "Inventory", icon: Package },
-  { href: "/dashboard/alerts", label: "Alerts", icon: AlertTriangle },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", labelKey: "nav.overview", icon: LayoutDashboard },
+  { href: "/dashboard/jarvis", labelKey: "nav.jarvis", icon: Bot },
+  { href: "/dashboard/demand-analysis", labelKey: "nav.demandSpikes", icon: Zap },
+  { href: "/dashboard/product-analysis", labelKey: "nav.productAnalysis", icon: Box },
+  { href: "/dashboard/category-analysis", labelKey: "nav.categoryAnalysis", icon: Tag },
+  { href: "/dashboard/purchase-list", labelKey: "nav.purchaseList", icon: ShoppingCart },
+  { href: "/dashboard/forecasts", labelKey: "nav.forecasts", icon: TrendingUp },
+  { href: "/dashboard/inventory", labelKey: "nav.inventory", icon: Package },
+  { href: "/dashboard/alerts", labelKey: "nav.alerts", icon: AlertTriangle },
+  { href: "/dashboard/settings", labelKey: "nav.settings", icon: Settings },
 ];
 
 interface SidebarProps {
@@ -28,6 +30,7 @@ interface SidebarProps {
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const { lang, setLang, t } = useLang();
   const [collapsed, setCollapsed] = useState(false);
 
   const storeName = user?.user_metadata?.store_name || "My Store";
@@ -80,7 +83,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <button onClick={() => setShowAddProduct(true)}
           className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-all">
           <Plus className="w-4 h-4 shrink-0" />
-          {!collapsed && <span>Add Product</span>}
+          {!collapsed && <span>{t("nav.addProduct")}</span>}
         </button>
       </div>
 
@@ -93,7 +96,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 isActive ? "bg-primary/10 text-primary" : "text-sidebar-foreground hover:bg-secondary"
               }`}>
               <item.icon className={`w-5 h-5 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span>{t(item.labelKey)}</span>}
               {isActive && item.href === "/dashboard/alerts" && (
                 <span className="ml-auto bg-danger text-white text-xs font-bold px-2 py-0.5 rounded-full">3</span>
               )}
@@ -102,9 +105,32 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         })}
       </nav>
 
-      <div className="border-t border-border px-3 py-4 shrink-0">
+      <div className="border-t border-border px-3 py-4 shrink-0 space-y-2">
+        {/* Language Selector */}
         {!collapsed && (
-          <div className="px-3 mb-3">
+          <div className="px-1 mb-2">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Globe className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground">Language</span>
+            </div>
+            <select value={lang} onChange={e => setLang(e.target.value as any)}
+              className="w-full px-2.5 py-1.5 bg-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+              {LANGUAGES.map(l => (
+                <option key={l.code} value={l.code}>{l.nativeName}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {collapsed && (
+          <button onClick={() => {
+            const idx = LANGUAGES.findIndex(l => l.code === lang);
+            setLang(LANGUAGES[(idx + 1) % LANGUAGES.length].code);
+          }} className="flex items-center justify-center w-full px-3 py-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary" title="Change Language">
+            <Globe className="w-5 h-5" />
+          </button>
+        )}
+        {!collapsed && (
+          <div className="px-3 mb-2">
             <p className="text-sm font-semibold text-foreground truncate">{userName}</p>
             <p className="text-xs text-muted-foreground truncate">{storeName}</p>
           </div>
@@ -112,7 +138,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         <button onClick={signOut}
           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-danger hover:bg-danger/10 w-full transition-all">
           <LogOut className="w-5 h-5 shrink-0" />
-          {!collapsed && <span>Sign Out</span>}
+          {!collapsed && <span>{t("nav.signOut")}</span>}
         </button>
       </div>
     </div>

@@ -9,7 +9,11 @@ const GROQ_KEYS = [
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { storeCategory, storeSize, city, state, weather, forecast, news, events, location, inventory } = body;
+    const { storeCategory, storeSize, city, state, weather, forecast, news, events, location, inventory, lang } = body;
+
+    // Language mapping for Groq
+    const langMap: Record<string, string> = { hi: "Hindi", mr: "Marathi", ta: "Tamil", te: "Telugu", kn: "Kannada", bn: "Bengali", gu: "Gujarati" };
+    const langInstruction = lang && langMap[lang] ? `\n\nIMPORTANT: Write ALL text fields (summary, reason, description, recommendations, message, mitigation) in ${langMap[lang]}. Keep product names, numbers, and JSON keys in English.` : "";
 
     // Build compact inventory context for the AI
     const inventoryContext = inventory?.length
@@ -115,7 +119,7 @@ Based on ALL the above data, provide your analysis in the following JSON format 
   ]
 }
 
-Provide 7 demand spikes (one per day) with REALISTIC and VARYING probabilities (some days may be low at 20-40%). For each spike, list ONLY the 1-3 inventory products logically affected — NOT all products. For trendingProducts, include inventory products that are relevant plus up to 5 market suggestions (with inInventory: false). For inventoryRecommendations, provide one entry for EACH product in inventory with honest action (some may be "Maintain" if stock is fine).`;
+Provide 7 demand spikes (one per day) with REALISTIC and VARYING probabilities (some days may be low at 20-40%). For each spike, list ONLY the 1-3 inventory products logically affected — NOT all products. For trendingProducts, include inventory products that are relevant plus up to 5 market suggestions (with inInventory: false). For inventoryRecommendations, provide one entry for EACH product in inventory with honest action (some may be "Maintain" if stock is fine).${langInstruction}`;
 
     let completion: any = null;
     for (let i = 0; i < GROQ_KEYS.length; i++) {

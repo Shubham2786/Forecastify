@@ -2,21 +2,25 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useLang } from "@/lib/lang-context";
+import { useRouter } from "next/navigation";
 import {
   Mic, Volume2, VolumeX, Bot, Globe, X, Package,
   Cloud, MapPin, Zap, AlertTriangle, ExternalLink,
-  PauseCircle, PlayCircle,
+  PauseCircle, PlayCircle, TrendingUp, BarChart3, Tag, ShoppingCart, Loader2,
 } from "lucide-react";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 interface Message { role: "user" | "assistant"; content: string }
-interface PopupData { title: string; content: string }
+interface PopupData { title: string; content: string; loading?: boolean }
 interface ActionResult { type: string; result: any }
 type JarvisState = "sleeping" | "listening" | "thinking" | "speaking" | "idle" | "paused";
 
 export default function JarvisPage() {
   const { user } = useAuth();
+  const { lang: appLang } = useLang();
+  const router = useRouter();
 
   const [state, setState] = useState<JarvisState>("sleeping");
   const [transcript, setTranscript] = useState("");
@@ -35,6 +39,7 @@ export default function JarvisPage() {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [lang, setLang] = useState<"en-IN" | "hi-IN">("en-IN");
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [micAllowed, setMicAllowed] = useState<boolean | null>(null); // null=unknown, true=granted, false=denied
 
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -47,6 +52,11 @@ export default function JarvisPage() {
   const historyRef = useRef<Message[]>([]);
   const newsRef = useRef<any>(null);
   const pauseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const latRef = useRef(0);
+  const lonRef = useRef(0);
+  const clapStreamRef = useRef<MediaStream | null>(null);
+  const clapCtxRef = useRef<AudioContext | null>(null);
+  const clapAnimRef = useRef<number>(0);
 
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => { weatherRef.current = weather; }, [weather]);
@@ -72,7 +82,7 @@ export default function JarvisPage() {
     speechSynthesis.onvoiceschanged = load;
   }, []);
 
-  // Unlock audio on first click (browser requirement)
+  // Unlock audio
   const unlockAudio = useCallback(() => {
     if (audioUnlocked || !synthRef.current) return;
     const utt = new SpeechSynthesisUtterance(" ");
@@ -90,6 +100,8 @@ export default function JarvisPage() {
           navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
         );
         const { latitude: lat, longitude: lon } = pos.coords;
+        latRef.current = lat;
+        lonRef.current = lon;
         const [wRes, lRes] = await Promise.all([
           fetch(`/api/weather?lat=${lat}&lon=${lon}`),
           fetch(`/api/location?lat=${lat}&lon=${lon}`),
@@ -116,7 +128,6 @@ export default function JarvisPage() {
     setState("speaking");
     isSpeakingRef.current = true;
 
-    // Use single utterance for short text (more reliable)
     const utt = new SpeechSynthesisUtterance(clean);
     utt.lang = lang;
     utt.rate = 1.0;
@@ -144,7 +155,7 @@ export default function JarvisPage() {
     }, 5000);
     const origEnd = utt.onend;
     utt.onend = (e) => { clearInterval(keepAlive); (origEnd as any)?.(e); };
-    utt.onerror = (e) => { clearInterval(keepAlive); isSpeakingRef.current = false; setState("idle"); onDone?.(); };
+    utt.onerror = () => { clearInterval(keepAlive); isSpeakingRef.current = false; setState("idle"); onDone?.(); };
   }, [voiceEnabled, lang]);
 
   const stopSpeaking = useCallback(() => {
@@ -160,7 +171,6 @@ export default function JarvisPage() {
     try { recognitionRef.current?.stop(); } catch {}
     setState("paused");
     setJarvisText("Jarvis paused. Click resume when ready, Sir.");
-    // Auto-resume after 60 seconds
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
     pauseTimerRef.current = setTimeout(() => resumeJarvis(), 60000);
   }, [stopSpeaking]);
@@ -178,6 +188,298 @@ export default function JarvisPage() {
     } catch {}
     speak("Back online, Sir.");
   }, [speak]);
+
+  // ---- FEATURE API CALLS ----
+  // Fetch inventory once for reuse
+  const fetchInventory = useCallback(async () => {
+    if (!user) return [];
+    const { createClient } = await import("@supabase/supabase-js");
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const { data } = await sb.from("inventory").select("product_name, category, quantity, unit, price, min_stock, max_stock, brand, sku").eq("store_id", user.id);
+    return data || [];
+  }, [user]);
+
+  const fetchStoreProfile = useCallback(async () => {
+    if (!user) return null;
+    const { createClient } = await import("@supabase/supabase-js");
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const { data } = await sb.from("profiles").select("store_name, store_category, store_size, city, state, store_address").eq("id", user.id).single();
+    return data;
+  }, [user]);
+
+  const fetchWeatherFull = useCallback(async () => {
+    if (!latRef.current) return null;
+    try {
+      const res = await fetch(`/api/weather?lat=${latRef.current}&lon=${lonRef.current}`);
+      if (res.ok) return await res.json();
+    } catch {}
+    return null;
+  }, []);
+
+  const callFeatureAPI = useCallback(async (actionType: string, params: any) => {
+    if (!user) return;
+
+    const showLoading = (title: string) => {
+      setPopup({ title, content: "<div style='text-align:center;padding:20px;color:#94a3b8;'>Analyzing data...</div>", loading: true });
+    };
+
+    try {
+      switch (actionType) {
+        case "product_analysis": {
+          const productName = params.product || "Milk";
+          showLoading(`Product Analysis: ${productName}`);
+
+          // Fetch weather data for the API
+          const weatherFull = await fetchWeatherFull();
+
+          const res = await fetch("/api/product-analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              productName,
+              userId: user.id,
+              weather: weatherFull?.current || weatherRef.current,
+              weatherForecast: weatherFull?.forecast,
+              location: locationRef.current,
+            }),
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            setPopup({ title: `Product Analysis: ${productName}`, content: `<p style="color:#ef4444;">Error: ${data.error}</p>` });
+            return;
+          }
+
+          // Response: { analysis: { productName, dailyForecast, summary, totalPredictedSales, stockRequired, ... }, product, weather }
+          const a = data.analysis || data;
+          const forecast = a.dailyForecast || [];
+          let html = `<div style="margin-bottom:10px;">
+            <strong style="font-size:14px;">${a.productName || productName}</strong>
+            ${a.inInventory ? `<span style="margin-left:8px;color:#22c55e;font-size:11px;">In Stock: ${a.currentStock || 0} ${a.unit || "pcs"}</span>` : `<span style="margin-left:8px;color:#f59e0b;font-size:11px;">Not in inventory</span>`}
+          </div>`;
+
+          if (a.summary) html += `<p style="margin-bottom:10px;color:#94a3b8;font-size:12px;">${a.summary}</p>`;
+
+          if (forecast.length) {
+            html += `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <tr style="border-bottom:1px solid #333;"><th style="text-align:left;padding:5px;">Day</th><th style="text-align:right;padding:5px;">Sales</th><th style="text-align:right;padding:5px;">Conf.</th><th style="text-align:left;padding:5px;font-size:11px;">Reason</th></tr>`;
+            forecast.forEach((d: any) => {
+              html += `<tr style="border-bottom:1px solid #222;"><td style="padding:5px;">${d.day}</td><td style="text-align:right;padding:5px;font-weight:bold;">${d.predictedSales || 0}</td><td style="text-align:right;padding:5px;color:${(d.confidence || 0) >= 80 ? "#22c55e" : "#f59e0b"};">${d.confidence || 0}%</td><td style="padding:5px;color:#666;font-size:10px;">${(d.reason || "").slice(0, 40)}</td></tr>`;
+            });
+            html += `</table>`;
+          }
+
+          html += `<div style="margin-top:8px;display:flex;gap:12px;font-size:11px;">
+            <span style="color:#22c55e;">Weekly: ${a.totalPredictedSales || 0} units</span>
+            <span style="color:#f59e0b;">Need: ${a.stockRequired || 0}</span>
+            <span style="color:${a.restockUrgency === "High" ? "#ef4444" : "#888"};">Urgency: ${a.restockUrgency || "Low"}</span>
+          </div>`;
+
+          if (a.recommendations?.length) {
+            html += `<div style="margin-top:8px;border-top:1px solid #333;padding-top:6px;"><strong style="font-size:11px;">Recommendations:</strong>`;
+            a.recommendations.slice(0, 3).forEach((r: string) => { html += `<p style="color:#888;font-size:11px;margin:2px 0;">• ${r}</p>`; });
+            html += `</div>`;
+          }
+
+          setPopup({ title: `Product Analysis: ${a.productName || productName}`, content: html });
+          break;
+        }
+
+        case "demand_analysis": {
+          showLoading("Demand Spike Analysis");
+
+          // Demand analysis needs: storeCategory, storeSize, city, state, weather, forecast, news, events, location, inventory
+          const [inv, store, weatherFull] = await Promise.all([
+            fetchInventory(),
+            fetchStoreProfile(),
+            fetchWeatherFull(),
+          ]);
+
+          const res = await fetch("/api/demand-analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              storeCategory: store?.store_category || "Retail",
+              storeSize: store?.store_size || "Small",
+              city: store?.city || "Pune",
+              state: store?.state || "Maharashtra",
+              weather: weatherFull?.current || weatherRef.current,
+              forecast: weatherFull?.forecast,
+              news: newsRef.current,
+              events: newsRef.current?.events,
+              location: locationRef.current || store?.store_address || `${store?.city}, ${store?.state}`,
+              inventory: inv,
+            }),
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            setPopup({ title: "Demand Spike Analysis", content: `<p style="color:#ef4444;">Error: ${data.error}</p>` });
+            return;
+          }
+
+          // Response: { analysis: { summary, demandSpikes, trendingProducts, weatherImpact, inventoryRecommendations, riskAlerts } }
+          const a = data.analysis || {};
+          let html = "";
+
+          if (a.summary) html += `<p style="margin-bottom:10px;color:#94a3b8;font-size:12px;">${a.summary}</p>`;
+
+          // Weather impact
+          if (a.weatherImpact) {
+            const sev = a.weatherImpact.severity;
+            html += `<div style="margin-bottom:10px;padding:6px 10px;background:${sev === "High" ? "#7f1d1d" : "#1e293b"};border-radius:8px;font-size:12px;">
+              <strong>Weather Impact (${sev}):</strong> ${a.weatherImpact.description || ""}
+            </div>`;
+          }
+
+          // Demand spikes table
+          const spikes = a.demandSpikes || [];
+          if (spikes.length) {
+            html += `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <tr style="border-bottom:1px solid #333;"><th style="text-align:left;padding:5px;">Day</th><th style="text-align:right;padding:5px;">Spike %</th><th style="text-align:right;padding:5px;">Prob.</th><th style="text-align:left;padding:5px;">Reason</th></tr>`;
+            spikes.slice(0, 7).forEach((s: any) => {
+              html += `<tr style="border-bottom:1px solid #222;"><td style="padding:5px;">${s.dayName || s.day || "?"}</td><td style="text-align:right;padding:5px;color:#22c55e;font-weight:bold;">${s.expectedIncrease || "?"}</td><td style="text-align:right;padding:5px;">${s.spikeProbability || 0}%</td><td style="padding:5px;color:#888;font-size:10px;">${(s.reason || "").slice(0, 50)}</td></tr>`;
+            });
+            html += `</table>`;
+          }
+
+          // Risk alerts
+          if (a.riskAlerts?.length) {
+            html += `<div style="margin-top:8px;border-top:1px solid #333;padding-top:6px;"><strong style="font-size:11px;">Risk Alerts:</strong>`;
+            a.riskAlerts.slice(0, 3).forEach((r: any) => {
+              const color = r.severity === "critical" ? "#ef4444" : r.severity === "warning" ? "#f59e0b" : "#3b82f6";
+              html += `<p style="color:${color};font-size:11px;margin:3px 0;">⚠ ${r.message || r.type}</p>`;
+            });
+            html += `</div>`;
+          }
+
+          // Inventory recommendations
+          if (a.inventoryRecommendations?.length) {
+            html += `<div style="margin-top:8px;border-top:1px solid #333;padding-top:6px;"><strong style="font-size:11px;">Stock Actions:</strong>`;
+            a.inventoryRecommendations.filter((r: any) => r.action !== "Maintain").slice(0, 5).forEach((r: any) => {
+              const color = r.urgency === "High" ? "#ef4444" : r.urgency === "Medium" ? "#f59e0b" : "#22c55e";
+              html += `<p style="font-size:11px;margin:2px 0;"><span style="color:${color};font-weight:bold;">${r.action}</span> ${r.product}: ${r.currentAdvice || ""}</p>`;
+            });
+            html += `</div>`;
+          }
+
+          setPopup({ title: "Demand Spike Analysis", content: html || "<p>No significant spikes detected.</p>" });
+          break;
+        }
+
+        case "category_analysis": {
+          const categoryName = params.category || "";
+          showLoading(`Category Analysis${categoryName ? `: ${categoryName}` : ""}`);
+
+          const res = await fetch("/api/category-analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              category: categoryName,
+              userId: user.id,
+              weather: weatherRef.current,
+              location: locationRef.current,
+            }),
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            setPopup({ title: "Category Analysis", content: `<p style="color:#ef4444;">Error: ${data.error}</p>` });
+            return;
+          }
+
+          // Response: { analysis: { category, summary, topBrands, products, missingProducts, recommendations }, myProducts }
+          const a = data.analysis || {};
+          let html = "";
+
+          html += `<div style="margin-bottom:8px;"><strong style="font-size:14px;">${a.category || categoryName || "All"}</strong>
+            <span style="margin-left:8px;color:#888;font-size:11px;">Demand: ${a.totalCategoryDemand || "?"} | Weekly: ~${a.weeklyEstimate || "?"} units</span></div>`;
+
+          if (a.summary) html += `<p style="margin-bottom:10px;color:#94a3b8;font-size:12px;">${a.summary}</p>`;
+
+          // Top brands
+          if (a.topBrands?.length) {
+            html += `<div style="margin-bottom:8px;"><strong style="font-size:11px;">Top Brands:</strong><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">`;
+            a.topBrands.slice(0, 6).forEach((b: any) => {
+              html += `<span style="display:inline-block;background:#6366f1;color:white;padding:2px 8px;border-radius:12px;font-size:10px;">${b.brand} (${b.popularity || "?"}%)</span>`;
+            });
+            html += `</div></div>`;
+          }
+
+          // Products table
+          if (a.products?.length) {
+            html += `<table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <tr style="border-bottom:1px solid #333;"><th style="text-align:left;padding:4px;">Product</th><th style="text-align:right;padding:4px;">Daily</th><th style="text-align:center;padding:4px;">Status</th><th style="text-align:right;padding:4px;">Stock</th></tr>`;
+            a.products.slice(0, 10).forEach((p: any) => {
+              const statusColor = p.stockStatus === "Low" || p.stockStatus === "Out of Stock" ? "#ef4444" : p.stockStatus === "Sufficient" ? "#22c55e" : "#f59e0b";
+              html += `<tr style="border-bottom:1px solid #222;"><td style="padding:4px;">${p.name}<br/><span style="color:#666;font-size:9px;">${p.brand || ""}</span></td><td style="text-align:right;padding:4px;font-weight:bold;">${p.dailyDemand || 0}</td><td style="text-align:center;padding:4px;color:${statusColor};font-size:10px;">${p.stockStatus || "?"}</td><td style="text-align:right;padding:4px;">${p.inMyInventory ? `${p.myStock || 0}${p.myUnit || ""}` : "—"}</td></tr>`;
+            });
+            html += `</table>`;
+          }
+
+          // Missing products
+          if (a.missingProducts?.length) {
+            html += `<div style="margin-top:6px;"><strong style="font-size:11px;color:#f59e0b;">Should Stock:</strong> <span style="font-size:11px;color:#888;">${a.missingProducts.slice(0, 5).join(", ")}</span></div>`;
+          }
+
+          // Recommendations
+          if (a.recommendations?.length) {
+            html += `<div style="margin-top:6px;border-top:1px solid #333;padding-top:4px;">`;
+            a.recommendations.slice(0, 3).forEach((r: string) => { html += `<p style="color:#888;font-size:11px;margin:2px 0;">• ${r}</p>`; });
+            html += `</div>`;
+          }
+
+          setPopup({ title: `Category: ${a.category || categoryName || "Analysis"}`, content: html });
+          break;
+        }
+
+        case "alerts": {
+          showLoading("Stock Alerts");
+
+          const res = await fetch("/api/alerts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: user.id,
+              weather: weatherRef.current,
+            }),
+          });
+          const data = await res.json();
+
+          // Response: { alerts: [...], summary: {critical, warning, info} } or just array
+          const alerts = data.alerts || (Array.isArray(data) ? data : []);
+          const summary = data.summary;
+
+          if (!alerts.length) {
+            setPopup({ title: "Stock Alerts", content: "<p style='color:#22c55e;text-align:center;padding:20px;'>All clear! No alerts, Sir.</p>" });
+            return;
+          }
+
+          let html = "";
+          if (summary) {
+            html += `<div style="display:flex;gap:12px;margin-bottom:10px;font-size:12px;">
+              <span style="color:#ef4444;">Critical: ${summary.critical || 0}</span>
+              <span style="color:#f59e0b;">Warning: ${summary.warning || 0}</span>
+              <span style="color:#3b82f6;">Info: ${summary.info || 0}</span>
+            </div>`;
+          }
+
+          html += `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tr style="border-bottom:1px solid #333;"><th style="text-align:left;padding:5px;">Product</th><th style="text-align:center;padding:5px;">Type</th><th style="text-align:left;padding:5px;">Action</th></tr>`;
+          alerts.forEach((a: any) => {
+            const color = a.type === "stockout" || a.severity === "critical" ? "#ef4444" : a.type === "overstock" ? "#3b82f6" : "#f59e0b";
+            html += `<tr style="border-bottom:1px solid #222;"><td style="padding:5px;">${a.product || a.product_name || "?"}</td><td style="text-align:center;padding:5px;"><span style="color:${color};font-weight:bold;font-size:10px;text-transform:uppercase;">${a.type || a.severity || "alert"}</span></td><td style="padding:5px;color:#888;font-size:11px;">${a.action || a.recommendation || a.message || ""}</td></tr>`;
+          });
+          html += `</table>`;
+
+          setPopup({ title: `Stock Alerts (${alerts.length})`, content: html });
+          break;
+        }
+      }
+    } catch (err: any) {
+      setPopup({ title: "Error", content: `<p style="color:#ef4444;">Failed: ${err.message || "Unknown error"}</p>` });
+    }
+  }, [user, fetchInventory, fetchStoreProfile, fetchWeatherFull]);
 
   // ---- JARVIS CORE ----
   const sendToJarvis = useCallback(async (text: string) => {
@@ -199,14 +501,14 @@ export default function JarvisPage() {
         body: JSON.stringify({
           message: text.trim(),
           userId: user.id,
-          conversationHistory: newHistory.slice(-4),
+          conversationHistory: newHistory.slice(-2),
           weather: weatherRef.current,
           location: locationRef.current,
           news: newsRef.current,
+          lang: appLang,
         }),
       });
       const data = await res.json();
-      // Strip any leftover action tags from response text
       const rawResponse = data.response || "Brief interruption, Sir.";
       const cleanResponse = rawResponse
         .replace(/[<\[]action[>\]][\s\S]*?[<\[]\/?action[>\]]/gi, "")
@@ -226,25 +528,31 @@ export default function JarvisPage() {
             setPopup({ title: action.result.title, content: action.result.content });
             setPopupHovered(false);
             if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
-            popupTimerRef.current = setTimeout(() => { setPopup(p => popupHovered ? p : null); }, 5000);
+            popupTimerRef.current = setTimeout(() => { setPopup(p => popupHovered ? p : null); }, 8000);
           }
 
           if ((action.type === "list" || action.type === "search") && action.result?.data?.length) {
             setInventoryPopup(action.result.data);
             setInvHovered(false);
             if (invTimerRef.current) clearTimeout(invTimerRef.current);
-            invTimerRef.current = setTimeout(() => { setInventoryPopup(p => invHovered ? p : null); }, 5000);
+            invTimerRef.current = setTimeout(() => { setInventoryPopup(p => invHovered ? p : null); }, 8000);
           }
 
           if ((action.type === "add" || action.type === "reduce" || action.type === "update" || action.type === "duplicate") && action.result?.data) {
             setInventoryPopup([action.result.data]);
             setInvHovered(false);
             if (invTimerRef.current) clearTimeout(invTimerRef.current);
-            invTimerRef.current = setTimeout(() => { setInventoryPopup(p => invHovered ? p : null); }, 5000);
+            invTimerRef.current = setTimeout(() => { setInventoryPopup(p => invHovered ? p : null); }, 8000);
           }
 
-          if (action.type === "delete") {
-            // Show brief confirmation — no popup needed
+          // Feature actions — call actual APIs and show in popup
+          if (["product_analysis", "demand_analysis", "category_analysis", "alerts"].includes(action.type)) {
+            callFeatureAPI(action.type, action.result);
+          }
+
+          // Navigation actions
+          if (action.type === "navigate" && action.result?.path) {
+            router.push(action.result.path);
           }
         }
       }
@@ -254,14 +562,29 @@ export default function JarvisPage() {
       setJarvisText("Connection lost briefly, Sir.");
       speak("Connection lost briefly, Sir.");
     }
-  }, [user, speak, unlockAudio, popupHovered, invHovered]);
+  }, [user, speak, unlockAudio, popupHovered, invHovered, callFeatureAPI, router]);
+
+  // ---- REQUEST MIC PERMISSION (must be from user gesture) ----
+  const requestMicPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Got permission — stop the stream immediately (SpeechRecognition manages its own)
+      stream.getTracks().forEach(t => t.stop());
+      setMicAllowed(true);
+      return true;
+    } catch {
+      setMicAllowed(false);
+      setJarvisText("Microphone blocked. Click the lock icon in Chrome's address bar → allow Microphone → reload.");
+      return false;
+    }
+  }, []);
 
   // ---- ALWAYS-ON RECOGNITION ----
   const startRecognition = useCallback(() => {
     const SpeechAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechAPI) return;
 
-    if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch {} }
+    if (recognitionRef.current) { try { recognitionRef.current.abort(); } catch {} }
 
     const recognition = new SpeechAPI();
     recognition.lang = lang;
@@ -271,6 +594,7 @@ export default function JarvisPage() {
     isListeningRef.current = true;
 
     let finalTranscript = "";
+    let wakeWordCooldown = false;
 
     recognition.onresult = (event: any) => {
       if (stateRef.current === "paused") return;
@@ -281,13 +605,15 @@ export default function JarvisPage() {
         if (event.results[i].isFinal) newFinal += t; else interim += t;
       }
 
-      // Wake word check
+      // Wake word check — check every result (interim + final)
       if (stateRef.current === "sleeping") {
-        const check = (finalTranscript + newFinal + interim).toLowerCase();
-        if (check.includes("jarvis") || check.includes("wake up") || check.includes("hey jarvis") || check.includes("hello jarvis")) {
+        const check = (newFinal + interim).toLowerCase();
+        if (!wakeWordCooldown && (check.includes("jarvis") || check.includes("jarv") || check.includes("wake up"))) {
+          wakeWordCooldown = true;
           finalTranscript = "";
           setTranscript("");
           sendToJarvis("Hey Jarvis, wake up.");
+          setTimeout(() => { wakeWordCooldown = false; }, 3000);
           return;
         }
         if (interim) setTranscript(interim);
@@ -300,6 +626,7 @@ export default function JarvisPage() {
         setTranscript(finalTranscript);
         setState("listening");
 
+        // 1.2s silence = send (fast response)
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = setTimeout(() => {
           if (finalTranscript.trim()) {
@@ -307,7 +634,7 @@ export default function JarvisPage() {
             finalTranscript = "";
             sendToJarvis(t);
           }
-        }, 1500);
+        }, 1200);
       }
 
       if (interim) {
@@ -317,28 +644,160 @@ export default function JarvisPage() {
       }
     };
 
-    recognition.onerror = (event: any) => { if (event.error === "not-allowed") isListeningRef.current = false; };
-    recognition.onend = () => {
-      if (isListeningRef.current && stateRef.current !== "paused") {
-        setTimeout(() => { try { recognition.start(); } catch {} }, 300);
+    recognition.onerror = (event: any) => {
+      if (event.error === "not-allowed") {
+        isListeningRef.current = false;
+        setMicAllowed(false);
+        setJarvisText("Microphone blocked. Click the lock icon in Chrome's address bar → allow Microphone → reload.");
       }
     };
+
+    recognition.onend = () => {
+      if (isListeningRef.current && stateRef.current !== "paused") {
+        try { recognition.start(); } catch {
+          setTimeout(() => { try { recognition.start(); } catch { startRecognition(); } }, 100);
+        }
+      }
+    };
+
     try { recognition.start(); } catch {}
   }, [lang, stopSpeaking, sendToJarvis]);
 
+  // Check mic permission on mount (without prompting)
   useEffect(() => {
     if (!user) return;
-    const t = setTimeout(() => startRecognition(), 1000);
-    return () => { clearTimeout(t); isListeningRef.current = false; try { recognitionRef.current?.stop(); } catch {} };
+    // Check if permission was already granted (no prompt)
+    navigator.permissions?.query({ name: "microphone" as PermissionName }).then(result => {
+      if (result.state === "granted") {
+        setMicAllowed(true);
+        startRecognition();
+      } else if (result.state === "denied") {
+        setMicAllowed(false);
+      }
+      // If "prompt" — wait for user click
+    }).catch(() => {
+      // permissions API not supported — wait for user click
+    });
+    return () => { isListeningRef.current = false; try { recognitionRef.current?.abort(); } catch {} };
   }, [user, startRecognition]);
 
-  const wakeUp = useCallback(() => {
+  // ---- CLAP DETECTION (double clap to wake) ----
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    async function startClapDetection() {
+      // Only start if mic is already allowed
+      try {
+        const permResult = await navigator.permissions?.query({ name: "microphone" as PermissionName });
+        if (permResult?.state !== "granted") return;
+      } catch { return; }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        clapStreamRef.current = stream;
+
+        const audioCtx = new AudioContext();
+        clapCtxRef.current = audioCtx;
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.3;
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        let lastClapTime = 0;
+        let clapCount = 0;
+        let cooldown = false;
+
+        function detect() {
+          if (cancelled) return;
+          clapAnimRef.current = requestAnimationFrame(detect);
+
+          // Only detect claps when sleeping
+          if (stateRef.current !== "sleeping") {
+            clapCount = 0;
+            return;
+          }
+
+          analyser.getByteFrequencyData(dataArray);
+          // Calculate RMS volume
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i] * dataArray[i];
+          const rms = Math.sqrt(sum / dataArray.length);
+
+          // Clap = sharp spike above threshold
+          const now = Date.now();
+          if (rms > 120 && !cooldown) {
+            cooldown = true;
+            clapCount++;
+
+            if (clapCount === 1) {
+              lastClapTime = now;
+            } else if (clapCount >= 2 && now - lastClapTime < 1000) {
+              // Double clap detected!
+              clapCount = 0;
+              // Trigger wake via sendToJarvis
+              const wakeEvent = new CustomEvent("jarvis-clap-wake");
+              window.dispatchEvent(wakeEvent);
+            }
+
+            // Reset if too slow between claps
+            if (now - lastClapTime > 1200) {
+              clapCount = 1;
+              lastClapTime = now;
+            }
+
+            // Cooldown to avoid counting one clap as multiple
+            setTimeout(() => { cooldown = false; }, 250);
+          }
+        }
+
+        detect();
+      } catch {
+        // Mic not available for clap detection — silent fail
+      }
+    }
+
+    // Small delay to let other audio init first
+    const timer = setTimeout(startClapDetection, 2000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      if (clapAnimRef.current) cancelAnimationFrame(clapAnimRef.current);
+      clapStreamRef.current?.getTracks().forEach(t => t.stop());
+      clapCtxRef.current?.close().catch(() => {});
+    };
+  }, [user]);
+
+  // Listen for clap wake event
+  useEffect(() => {
+    function handleClapWake() {
+      if (stateRef.current === "sleeping") {
+        unlockAudio();
+        sendToJarvis("Hey Jarvis, wake up.");
+      }
+    }
+    window.addEventListener("jarvis-clap-wake", handleClapWake);
+    return () => window.removeEventListener("jarvis-clap-wake", handleClapWake);
+  }, [sendToJarvis, unlockAudio]);
+
+  const wakeUp = useCallback(async () => {
     unlockAudio();
+    // Request mic permission on first click (user gesture required by Chrome)
+    if (micAllowed !== true) {
+      const granted = await requestMicPermission();
+      if (!granted) return;
+      // Start recognition now that we have permission
+      startRecognition();
+    }
     if (state === "sleeping" || state === "paused") {
       if (state === "paused") resumeJarvis();
       sendToJarvis("Hey Jarvis, wake up.");
     }
-  }, [state, sendToJarvis, unlockAudio, resumeJarvis]);
+  }, [state, sendToJarvis, unlockAudio, resumeJarvis, micAllowed, requestMicPermission, startRecognition]);
 
   // ---- RENDER ----
   const stateColor: Record<JarvisState, string> = {
@@ -376,7 +835,6 @@ export default function JarvisPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Pause/Resume */}
           {state !== "sleeping" && (
             <button
               onClick={state === "paused" ? resumeJarvis : pauseJarvis}
@@ -470,7 +928,14 @@ export default function JarvisPage() {
           <div className="text-center animate-in fade-in max-w-2xl">
             <p className="text-muted-foreground mb-5">
               {state === "paused" ? "Jarvis is paused. Click resume or the orb to continue." :
-                <span className="flex items-center justify-center gap-2"><Mic className="w-4 h-4 text-cyan-500/50 animate-pulse" /> Say <strong>&quot;Hey Jarvis&quot;</strong> or click below</span>
+                micAllowed === false ? (
+                  <span className="flex flex-col items-center gap-2 text-red-400">
+                    <span>Microphone access denied.</span>
+                    <span className="text-xs text-muted-foreground">Click the lock/site-settings icon in Chrome&apos;s address bar → Allow Microphone → Reload the page</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2"><Mic className="w-4 h-4 text-cyan-500/50 animate-pulse" /> Say <strong>&quot;Hey Jarvis&quot;</strong> or click below</span>
+                )
               }
             </p>
             <button onClick={wakeUp}
@@ -483,22 +948,22 @@ export default function JarvisPage() {
                 <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-3">
                   <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center mb-2"><Mic className="w-4 h-4 text-cyan-500" /></div>
                   <p className="text-xs font-semibold text-foreground">Voice Control</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Speak naturally in Hindi or English to manage your store</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Speak naturally in Hindi or English</p>
                 </div>
                 <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-3">
                   <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center mb-2"><Package className="w-4 h-4 text-purple-500" /></div>
                   <p className="text-xs font-semibold text-foreground">Inventory Mgmt</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Add, update, delete or search products by just saying it</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Add, update, delete products by voice</p>
                 </div>
                 <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center mb-2"><Cloud className="w-4 h-4 text-blue-500" /></div>
-                  <p className="text-xs font-semibold text-foreground">Live Weather</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Real-time weather briefing for your store location</p>
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center mb-2"><TrendingUp className="w-4 h-4 text-indigo-500" /></div>
+                  <p className="text-xs font-semibold text-foreground">AI Analysis</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Product, demand, category analysis on command</p>
                 </div>
                 <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-xl p-3">
-                  <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center mb-2"><ExternalLink className="w-4 h-4 text-green-500" /></div>
-                  <p className="text-xs font-semibold text-foreground">News & Trends</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Latest market news, offers and trending products</p>
+                  <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center mb-2"><AlertTriangle className="w-4 h-4 text-green-500" /></div>
+                  <p className="text-xs font-semibold text-foreground">Smart Alerts</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Stockout & overstock alerts with voice</p>
                 </div>
               </div>
             )}
@@ -507,12 +972,16 @@ export default function JarvisPage() {
 
         {/* Quick actions */}
         {state === "idle" && (
-          <div className="flex flex-wrap justify-center gap-2 max-w-lg animate-in fade-in">
+          <div className="flex flex-wrap justify-center gap-2 max-w-2xl animate-in fade-in">
             {[
               { label: "Show inventory", icon: Package },
-              { label: "Daily news", icon: ExternalLink },
+              { label: "Product analysis for Milk", icon: TrendingUp },
+              { label: "Show demand spikes", icon: BarChart3 },
+              { label: "Category analysis", icon: Tag },
+              { label: "Show alerts", icon: AlertTriangle },
               { label: "Weather update", icon: Cloud },
-              { label: "Any alerts?", icon: AlertTriangle },
+              { label: "Show forecasts", icon: TrendingUp },
+              { label: "Daily news", icon: ExternalLink },
             ].map(({ label, icon: Icon }) => (
               <button key={label} onClick={() => sendToJarvis(label)}
                 className="flex items-center gap-2 px-4 py-2 bg-secondary/50 backdrop-blur-sm hover:bg-secondary text-sm text-muted-foreground hover:text-foreground rounded-full transition-all">
@@ -523,16 +992,20 @@ export default function JarvisPage() {
         )}
       </div>
 
-      {/* Popup */}
+      {/* Feature Popup */}
       {popup && (
-        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right w-[420px] max-h-[70vh] bg-card border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-500/10 overflow-hidden"
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right w-[480px] max-h-[75vh] bg-card border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-500/10 overflow-hidden"
           onMouseEnter={() => { setPopupHovered(true); if (popupTimerRef.current) clearTimeout(popupTimerRef.current); }}
-          onMouseLeave={() => { setPopupHovered(false); popupTimerRef.current = setTimeout(() => setPopup(null), 3000); }}>
+          onMouseLeave={() => { setPopupHovered(false); popupTimerRef.current = setTimeout(() => setPopup(null), 5000); }}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-cyan-500/10 to-blue-500/10">
-            <h3 className="font-bold text-foreground text-sm flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-cyan-500" /> {popup.title}</h3>
+            <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+              {popup.loading ? <Loader2 className="w-3.5 h-3.5 text-cyan-500 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-cyan-500" />}
+              {popup.title}
+            </h3>
             <button onClick={() => setPopup(null)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
           </div>
-          <div className="p-4 overflow-y-auto max-h-[55vh] text-sm text-foreground/80 leading-relaxed" dangerouslySetInnerHTML={{ __html: popup.content }} />
+          <div className="p-4 overflow-y-auto max-h-[60vh] text-sm text-foreground/80 leading-relaxed [&_table]:w-full [&_th]:text-left [&_th]:text-muted-foreground [&_th]:font-semibold [&_td]:text-foreground/80" dangerouslySetInnerHTML={{ __html: popup.content }} />
+          {!popupHovered && !popup.loading && <div className="h-0.5 bg-cyan-500/30"><div className="h-full bg-cyan-500" style={{ animation: "shrink 8s linear forwards" }} /></div>}
         </div>
       )}
 
@@ -540,7 +1013,7 @@ export default function JarvisPage() {
       {inventoryPopup && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right w-[520px] max-h-[75vh] bg-card border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-500/10 overflow-hidden"
           onMouseEnter={() => { setInvHovered(true); if (invTimerRef.current) clearTimeout(invTimerRef.current); }}
-          onMouseLeave={() => { setInvHovered(false); invTimerRef.current = setTimeout(() => setInventoryPopup(null), 3000); }}>
+          onMouseLeave={() => { setInvHovered(false); invTimerRef.current = setTimeout(() => setInventoryPopup(null), 5000); }}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-cyan-500/10 to-blue-500/10">
             <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
               <Package className="w-3.5 h-3.5 text-cyan-500" /> Inventory — {inventoryPopup.length} {inventoryPopup.length === 1 ? "item" : "items"}
@@ -580,7 +1053,7 @@ export default function JarvisPage() {
               </tbody>
             </table>
           </div>
-          {!invHovered && <div className="h-0.5 bg-cyan-500/30"><div className="h-full bg-cyan-500" style={{ animation: "shrink 5s linear forwards" }} /></div>}
+          {!invHovered && <div className="h-0.5 bg-cyan-500/30"><div className="h-full bg-cyan-500" style={{ animation: "shrink 8s linear forwards" }} /></div>}
         </div>
       )}
 
@@ -589,16 +1062,16 @@ export default function JarvisPage() {
         <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all ${
           state === "listening" ? "bg-cyan-500/20 text-cyan-500" : state === "paused" ? "bg-orange-500/20 text-orange-500" : "bg-secondary/50 text-muted-foreground"
         }`}>
-          <Mic className={`w-3.5 h-3.5 ${state === "listening" ? "animate-pulse text-cyan-500" : ""}`} />
-          {state === "listening" ? "Listening..." : state === "paused" ? "Paused — 60s auto-resume" : state === "sleeping" ? "Say \"Hey Jarvis\"" : "Always listening"}
+          <Mic className={`w-3.5 h-3.5 ${state === "listening" ? "animate-pulse text-cyan-500" : micAllowed === false ? "text-red-500" : ""}`} />
+          {micAllowed === false ? "Mic blocked — allow in browser" : state === "listening" ? "Listening..." : state === "paused" ? "Paused — 60s auto-resume" : state === "sleeping" ? "Click to start or say \"Hey Jarvis\"" : "Always listening"}
         </div>
       </div>
 
       {/* Corners */}
-      <div className="absolute top-4 left-4 w-8 h-8 border-l-2 border-t-2 border-cyan-500/20 rounded-tl-lg" />
-      <div className="absolute top-4 right-4 w-8 h-8 border-r-2 border-t-2 border-cyan-500/20 rounded-tr-lg" />
-      <div className="absolute bottom-4 left-4 w-8 h-8 border-l-2 border-b-2 border-cyan-500/20 rounded-bl-lg" />
-      <div className="absolute bottom-4 right-4 w-8 h-8 border-r-2 border-b-2 border-cyan-500/20 rounded-br-lg" />
+      <div className="absolute top-0 left-0 w-16 h-16 border-l-2 border-t-2 border-cyan-500/10" />
+      <div className="absolute top-0 right-0 w-16 h-16 border-r-2 border-t-2 border-cyan-500/10" />
+      <div className="absolute bottom-0 left-0 w-16 h-16 border-l-2 border-b-2 border-cyan-500/10" />
+      <div className="absolute bottom-0 right-0 w-16 h-16 border-r-2 border-b-2 border-cyan-500/10" />
     </div>
   );
 }

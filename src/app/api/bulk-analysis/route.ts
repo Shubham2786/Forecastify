@@ -29,7 +29,9 @@ interface ProductInput {
 
 export async function POST(request: Request) {
   try {
-    const { products, userId, weather, weatherForecast, location } = await request.json();
+    const { products, userId, weather, weatherForecast, location, lang } = await request.json();
+    const langMap: Record<string, string> = { hi: "Hindi", mr: "Marathi", ta: "Tamil", te: "Telugu", kn: "Kannada", bn: "Bengali", gu: "Gujarati" };
+    const langInstruction = lang && langMap[lang] ? `\nIMPORTANT: Write adjustmentReason, priorityReason, suggestions in ${langMap[lang]}. Keep product names, numbers, JSON keys in English.` : "";
     if (!products?.length || !userId) {
       return Response.json({ error: "products array and userId required" }, { status: 400 });
     }
@@ -152,7 +154,7 @@ RULES:
   If user gave price, USE THAT. If "?", estimate realistic MRP of 1 unit.
 - estimatedCost = recommendedQty × price_per_unit. Example: 34 bottles × ₹20 = ₹680.
 - recommendedQty = weeklyDemand + 20% buffer - currentInventory. Round UP.
-- Priority HIGH: stock < 2 days demand. MEDIUM: < 5 days. LOW: sufficient.`;
+- Priority HIGH: stock < 2 days demand. MEDIUM: < 5 days. LOW: sufficient.${langInstruction}`;
 
     let completion: any = null;
     for (let i = 0; i < GROQ_KEYS.length; i++) {

@@ -1,0 +1,127 @@
+const en: Record<string, string> = {
+  // Nav
+  "nav.overview": "Overview",
+  "nav.jarvis": "Jarvis",
+  "nav.demandSpikes": "Demand Spikes",
+  "nav.productAnalysis": "Product Analysis",
+  "nav.categoryAnalysis": "Category Analysis",
+  "nav.purchaseList": "Purchase List",
+  "nav.forecasts": "Forecasts",
+  "nav.inventory": "Inventory",
+  "nav.alerts": "Alerts",
+  "nav.settings": "Settings",
+  "nav.signOut": "Sign Out",
+  "nav.addProduct": "Add Product",
+
+  // Dashboard Stat Cards
+  "stat.expectedSales": "Expected Sales (7 Days)",
+  "stat.vsLastWeek": "{{val}}% vs last week",
+  "stat.totalProducts": "Total Products in Store",
+  "stat.stockValue": "{{val}} total stock value",
+  "stat.accuracy": "Prediction Accuracy",
+  "stat.unitsExpected": "{{val}} units expected this week",
+  "stat.alerts": "Alerts (Attention!)",
+  "stat.alertBreakdown": "{{critical}} danger, {{low}} low, {{overstock}} extra",
+
+  // Risk Indicators
+  "risk.stockoutTitle": "Stockout Risk",
+  "risk.stockoutDesc": "may run out in 3 days",
+  "risk.products": "{{val}} products",
+  "risk.volatilityTitle": "Demand Change Rate",
+  "risk.volatilityHigh": "Very high fluctuation",
+  "risk.volatilityMed": "Moderate change",
+  "risk.volatilityLow": "Stable demand",
+  "risk.trendTitle": "This Week's Trend",
+  "risk.trendDesc": "compared to last week",
+  "risk.overstockTitle": "Overstock (Money Stuck)",
+  "risk.overstockDesc": "more stock than needed",
+
+  // Charts
+  "chart.forecastTitle": "7-Day Forecast (All {{count}} Products)",
+  "chart.forecastDesc": "Blue = next week prediction | Green = last week actual | Orange = recommended stock",
+  "chart.forecast": "Forecast",
+  "chart.lastWeek": "Last Week",
+  "chart.recommended": "Recommended",
+  "chart.categoryTitle": "Category Wise Stock",
+  "chart.categoryDesc": "How much stock in each category",
+  "chart.units": "units",
+
+  // Product Table
+  "table.productInsights": "Product Insights",
+  "table.topDemand": "Most Sold",
+  "table.lowStock": "Low Stock",
+  "table.highValue": "High Value",
+  "table.recent": "New Products",
+  "table.product": "Product",
+  "table.category": "Category",
+  "table.dailyDemand": "Daily Demand",
+  "table.weekly": "Weekly",
+  "table.stock": "Stock",
+  "table.daysLeft": "Days Left",
+  "table.needed": "Need More",
+  "table.qty": "Qty",
+  "table.price": "Price",
+  "table.status": "Status",
+  "table.totalValue": "Total Value",
+  "table.noData": "No data available",
+  "table.day": "day",
+  "table.days": "days",
+  "table.moreNeeded": "{{val}} more needed",
+  "table.ok": "OK",
+
+  // Status labels
+  "status.critical": "Out!",
+  "status.low": "Low",
+  "status.overstock": "Too Much",
+  "status.optimal": "Good",
+
+  // Business Insights
+  "biz.weatherTitle": "Weather Impact",
+  "biz.hotDays": "Hot days: avg {{val}} sold",
+  "biz.coldDays": "Cold days: avg {{val}} sold",
+  "biz.promoTitle": "Offer Impact",
+  "biz.promosRan": "{{val}} offers ran",
+  "biz.last30": "Last 30 days data",
+  "biz.noPromos": "No offers ran",
+  "biz.eventsTitle": "Upcoming Festivals",
+  "biz.noEvents": "No events in next 2 weeks",
+  "biz.patternsTitle": "Sales Pattern",
+  "biz.weekend": "Weekend (Sat-Sun)",
+  "biz.weekday": "Weekday (Mon-Fri)",
+  "biz.avgPerProduct": "avg/product",
+  "biz.weekendUplift": "Weekend sells {{val}}% {{dir}}",
+  "biz.more": "more",
+  "biz.less": "less",
+  "biz.liveSignals": "Live Signals",
+
+  // Risk Tables
+  "risk.stockoutTableTitle": "Stockout Probability",
+  "risk.stockoutTableDesc": "These products may run out soon — order first",
+  "risk.dailyDemandCol": "Daily Demand",
+  "risk.daysLeftCol": "Days Left",
+  "risk.probability": "Probability",
+  "risk.allSafe": "All safe! No product will run out soon",
+  "risk.volatilityTableTitle": "Demand Volatility",
+  "risk.volatilityTableDesc": "Higher % = more unpredictable — keep more buffer stock",
+  "risk.avgSales": "Avg Sales/day",
+  "risk.volatility": "Volatility",
+  "risk.level": "Level",
+  "risk.highChange": "Very Unstable",
+  "risk.medChange": "Moderate",
+  "risk.stable": "Stable",
+  "risk.noHistoric": "No historic data yet",
+  "risk.records": "records",
+
+  // Data source
+  "data.lastUpdated": "Last updated: {{time}}",
+  "data.source": "Data: {{records}} sales records from {{city}} | {{products}} products forecasted",
+
+  // Common
+  "common.loading": "Loading...",
+  "common.demand": "demand",
+  "common.din": "day",
+
+  // Groq language instruction
+  "groq.langInstruction": "Respond entirely in English.",
+};
+export default en;

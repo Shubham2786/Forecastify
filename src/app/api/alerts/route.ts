@@ -14,7 +14,9 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { userId, weather } = await request.json();
+    const { userId, weather, lang } = await request.json();
+    const langMap: Record<string, string> = { hi: "Hindi", mr: "Marathi", ta: "Tamil", te: "Telugu", kn: "Kannada", bn: "Bengali", gu: "Gujarati" };
+    const langInstruction = lang && langMap[lang] ? `\nIMPORTANT: Write all message, action, recommendation text in ${langMap[lang]}. Keep product names and JSON keys in English.` : "";
     if (!userId) return Response.json({ error: "userId required" }, { status: 400 });
 
     // Fetch inventory
@@ -86,7 +88,7 @@ Return JSON array ONLY:
   }
 ]
 
-Only include products that actually need alerts. Be realistic. Max 15 alerts.`;
+Only include products that actually need alerts. Be realistic. Max 15 alerts.${langInstruction}`;
 
     let completion: any = null;
     for (let i = 0; i < GROQ_KEYS.length; i++) {
