@@ -3,10 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Package, TrendingUp, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X, Zap, Bot, Box, Plus, Tag, ShoppingCart, Globe } from "lucide-react";
+import { BarChart3, LayoutDashboard, Package, AlertTriangle, Settings, ChevronLeft, ChevronRight, LogOut, X, Zap, Bot, Box, Plus, Tag, ShoppingCart } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/lang-context";
-import { LANGUAGES } from "@/lib/translations";
 import { supabase } from "@/lib/supabase";
 
 const navItems = [
@@ -16,7 +15,6 @@ const navItems = [
   { href: "/dashboard/product-analysis", labelKey: "nav.productAnalysis", icon: Box },
   { href: "/dashboard/category-analysis", labelKey: "nav.categoryAnalysis", icon: Tag },
   { href: "/dashboard/purchase-list", labelKey: "nav.purchaseList", icon: ShoppingCart },
-  { href: "/dashboard/forecasts", labelKey: "nav.forecasts", icon: TrendingUp },
   { href: "/dashboard/inventory", labelKey: "nav.inventory", icon: Package },
   { href: "/dashboard/alerts", labelKey: "nav.alerts", icon: AlertTriangle },
   { href: "/dashboard/settings", labelKey: "nav.settings", icon: Settings },
@@ -106,29 +104,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       </nav>
 
       <div className="border-t border-border px-3 py-4 shrink-0 space-y-2">
-        {/* Language Selector */}
-        {!collapsed && (
-          <div className="px-1 mb-2">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Globe className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Language</span>
-            </div>
-            <select value={lang} onChange={e => setLang(e.target.value as any)}
-              className="w-full px-2.5 py-1.5 bg-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-              {LANGUAGES.map(l => (
-                <option key={l.code} value={l.code}>{l.nativeName}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        {collapsed && (
-          <button onClick={() => {
-            const idx = LANGUAGES.findIndex(l => l.code === lang);
-            setLang(LANGUAGES[(idx + 1) % LANGUAGES.length].code);
-          }} className="flex items-center justify-center w-full px-3 py-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary" title="Change Language">
-            <Globe className="w-5 h-5" />
-          </button>
-        )}
         {!collapsed && (
           <div className="px-3 mb-2">
             <p className="text-sm font-semibold text-foreground truncate">{userName}</p>

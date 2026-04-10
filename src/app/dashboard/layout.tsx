@@ -13,7 +13,6 @@ const pageTitles: Record<string, string> = {
   "/dashboard/product-analysis": "Product Analysis",
   "/dashboard/category-analysis": "Category Analysis",
   "/dashboard/purchase-list": "Smart Purchase List",
-  "/dashboard/forecasts": "Demand Forecasts",
   "/dashboard/inventory": "Inventory Management",
   "/dashboard/alerts": "Alerts & Risks",
   "/dashboard/settings": "Settings",
