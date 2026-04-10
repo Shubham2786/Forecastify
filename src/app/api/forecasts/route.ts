@@ -14,6 +14,11 @@ export async function POST(request: Request) {
       .select("store_name, city, state").eq("id", userId).single();
     const city = store?.city || "Pune";
 
+    // Map to stores table for FK-based queries
+    const { data: matchedStore } = await supabase.from("stores")
+      .select("store_id").ilike("city", city).limit(1).maybeSingle();
+    const storeId = matchedStore?.store_id || 1;
+
     // 1. All products
     const { data: products } = await supabase.from("products")
       .select("product_id, product_name, category, subcategory, brand, mrp");
@@ -35,7 +40,7 @@ export async function POST(request: Request) {
     const next7 = new Date(); next7.setDate(next7.getDate() + 7);
     const { data: forecasts } = await supabase.from("demand_forecast")
       .select("date, product_id, predicted_units_sold, recommended_inventory_level, confidence")
-      .eq("store_id", 1).gte("date", today).lte("date", next7.toISOString().split("T")[0]);
+      .eq("store_id", storeId).gte("date", today).lte("date", next7.toISOString().split("T")[0]);
 
     // 4. Historic sales (last 14 days for comparison)
     const twoWeeksAgo = new Date(); twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
@@ -192,14 +197,24 @@ export async function POST(request: Request) {
       return { ...d, revenue: Math.round(dayRevenue) };
     });
 
+    // Test inputs for this store (test_input table)
+    const { data: testInputs } = await supabase.from("test_input")
+      .select("date, product_id").eq("store_id", storeId).gte("date", today);
+    const testProductIds = new Set(testInputs?.map(t => t.product_id) || []);
+
     return Response.json({
       store,
-      productForecasts,
+      storeId,
+      productForecasts: productForecasts.map(p => ({
+        ...p,
+        isTestInput: testProductIds.has(p.productId),
+      })),
       storeWideForecast: revenueForecast,
       totalProducts: productForecasts.length,
       criticalCount: productForecasts.filter(p => p.status === "critical").length,
       lowCount: productForecasts.filter(p => p.status === "low").length,
       overstockCount: productForecasts.filter(p => p.status === "overstock").length,
+      testInputs: { total: testInputs?.length || 0, productIds: [...testProductIds] },
       generatedAt: new Date().toISOString(),
     });
   } catch (err: any) {

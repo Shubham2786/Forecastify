@@ -101,6 +101,12 @@ export default function ForecastsPage() {
           <p className="text-xs text-muted-foreground">Overstock</p>
           <p className="text-xl font-bold text-blue-500">{data?.overstockCount || 0}</p>
         </div>
+        {data?.testInputs?.total > 0 && (
+          <div className="bg-card border border-border rounded-xl p-3 text-center col-span-2 sm:col-span-4">
+            <p className="text-xs text-muted-foreground">Test Inputs (test_input table)</p>
+            <p className="text-sm font-bold text-foreground">{data.testInputs.total} predictions required — {data.testInputs.productIds?.length || 0} unique products</p>
+          </div>
+        )}
       </div>
 
       {/* Product List + Detail */}
@@ -123,7 +129,10 @@ export default function ForecastsPage() {
                 className={`w-full text-left p-3 rounded-xl transition-all ${selectedProduct?.productId === product.productId ? "bg-primary/10 border border-primary/20" : "hover:bg-secondary border border-transparent"}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-foreground">{product.product}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {product.product}
+                      {product.isTestInput && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 font-medium">TEST</span>}
+                    </p>
                     <p className="text-xs text-muted-foreground">{product.category} &bull; {product.brand}</p>
                   </div>
                   <div className="flex items-center gap-1">

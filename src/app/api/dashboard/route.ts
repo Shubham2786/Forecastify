@@ -26,6 +26,12 @@ export async function POST(request: Request) {
     };
     const storeRegion = stateToRegion[storeState] || "West";
 
+    // Match user to stores table (PDF-required table)
+    const { data: matchedStore } = await supabase.from("stores")
+      .select("store_id, store_name, city, state, store_type, store_size_sqft")
+      .ilike("city", city).limit(1).maybeSingle();
+    const storeId = matchedStore?.store_id || 1;
+
     // 1. Full inventory
     const { data: inventory } = await supabase.from("inventory")
       .select("id, product_name, category, quantity, unit, price, min_stock, max_stock, brand, created_at")
@@ -74,7 +80,7 @@ export async function POST(request: Request) {
     const next7end = new Date(now); next7end.setDate(next7end.getDate() + 7);
     const { data: forecasts } = await supabase.from("demand_forecast")
       .select("date, product_id, predicted_units_sold, recommended_inventory_level, confidence")
-      .eq("store_id", 1).gte("date", today).lte("date", next7end.toISOString().split("T")[0]);
+      .eq("store_id", storeId).gte("date", today).lte("date", next7end.toISOString().split("T")[0]);
 
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dayNamesFull = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -314,6 +320,21 @@ export async function POST(request: Request) {
     const avgConfidence = forecasts?.length
       ? Math.round((forecasts.reduce((s, f) => s + (f.confidence || 0.75), 0) / forecasts.length) * 100) : 78;
 
+    // Weather data from database (weather_history table — PDF's "weather" table)
+    const last7W = new Date(now); last7W.setDate(last7W.getDate() - 7);
+    const { data: dbWeatherData } = await supabase.from("weather_history")
+      .select("date, avg_temp, max_temp, min_temp, humidity, weather_condition, rainfall_mm")
+      .eq("city", city).gte("date", last7W.toISOString().split("T")[0])
+      .order("date", { ascending: false }).limit(7);
+
+    // Test inputs — records the system must predict (test_input table)
+    const { data: testInputs } = await supabase.from("test_input")
+      .select("date, store_id, product_id")
+      .eq("store_id", storeId).gte("date", today).order("date");
+    const testFulfilled = testInputs?.filter(ti =>
+      forecasts?.some(f => f.date === ti.date && f.product_id === ti.product_id)
+    ).length || 0;
+
     return Response.json({
       store,
       stats: {
@@ -341,6 +362,10 @@ export async function POST(request: Request) {
       realtimeSignals,
       stockoutProducts: stockoutProducts.slice(0, 15),
       volatilityProducts: volatilityProducts.slice(0, 15),
+      matchedStore: matchedStore || null,
+      storeId,
+      dbWeather: dbWeatherData || [],
+      testInputs: { total: testInputs?.length || 0, fulfilled: testFulfilled, pending: (testInputs?.length || 0) - testFulfilled },
       generatedAt: new Date().toISOString(),
     });
   } catch (err: any) {
