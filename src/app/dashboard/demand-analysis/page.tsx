@@ -292,7 +292,7 @@ export default function DemandAnalysisPage() {
   .cover-band { background: linear-gradient(135deg, #312e81, #6366f1, #7c3aed); color:#fff; padding:22px 28px; margin:-18mm -16mm 0 -16mm; margin-bottom: 18px; }
   .cover-top { display:flex; justify-content:space-between; align-items:center; }
   .cover-brand { display:flex; align-items:center; gap:12px; }
-  .cover-logo { width:36px; height:36px; background:rgba(255,255,255,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; font-family:system-ui; }
+  .cover-logo { width:36px; height:36px; background:linear-gradient(135deg,#6366f1,#9333ea); border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; font-family:system-ui; box-shadow:0 4px 12px rgba(99,102,241,0.3); }
   .cover-brand span { font-size:20px; font-weight:700; letter-spacing:-0.5px; font-family:system-ui; }
   .cover-badge { background:rgba(255,255,255,0.15); padding:4px 14px; border-radius:20px; font-size:10px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; }
   .cover-title { font-size:24px; font-weight:700; margin-top:14px; line-height:1.2; font-family:system-ui; }
@@ -426,7 +426,7 @@ ${analysis?.riskAlerts?.length ? `<div class="section">
   .report-wrap { max-width:960px; margin:0 auto; background:#fff; border-radius:16px; box-shadow:0 4px 24px rgba(0,0,0,0.08); overflow:hidden; }
   .header-band { background:linear-gradient(135deg, #6366f1, #a855f7, #ec4899); padding:28px 32px; color:#fff; }
   .header-brand { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
-  .header-logo { width:40px; height:40px; background:rgba(255,255,255,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; }
+  .header-logo { width:40px; height:40px; background:linear-gradient(135deg,#6366f1,#9333ea); border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:18px; box-shadow:0 4px 12px rgba(99,102,241,0.3); }
   .header-brand span { font-size:18px; font-weight:700; }
   .header-band h1 { font-size:26px; font-weight:700; }
   .header-band p { font-size:13px; opacity:0.85; margin-top:4px; }

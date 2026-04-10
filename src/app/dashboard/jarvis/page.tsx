@@ -40,6 +40,7 @@ export default function JarvisPage() {
   const [lang, setLang] = useState<"en-IN" | "hi-IN">("en-IN");
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [micAllowed, setMicAllowed] = useState<boolean | null>(null); // null=unknown, true=granted, false=denied
+  const micStreamRef = useRef<MediaStream | null>(null); // keep mic stream alive to prevent Chrome from re-prompting
 
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -175,17 +176,14 @@ export default function JarvisPage() {
     pauseTimerRef.current = setTimeout(() => resumeJarvis(), 60000);
   }, [stopSpeaking]);
 
+  const startRecognitionRef = useRef<() => void>(() => {});
+
   const resumeJarvis = useCallback(() => {
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
     setState("idle");
     setJarvisText("Back online, Sir.");
-    isListeningRef.current = true;
-    try {
-      const SpeechAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechAPI && recognitionRef.current) {
-        recognitionRef.current.start();
-      }
-    } catch {}
+    // Full restart of recognition to ensure clean state
+    startRecognitionRef.current();
     speak("Back online, Sir.");
   }, [speak]);
 
@@ -566,10 +564,16 @@ export default function JarvisPage() {
 
   // ---- REQUEST MIC PERMISSION (must be from user gesture) ----
   const requestMicPermission = useCallback(async (): Promise<boolean> => {
+    // If already have a live stream, we're good
+    if (micStreamRef.current && micStreamRef.current.active) {
+      setMicAllowed(true);
+      return true;
+    }
     try {
+      // Keep the stream alive — Chrome revokes mic permission if all streams are stopped
+      // SpeechRecognition needs an active mic permission grant to work
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Got permission — stop the stream immediately (SpeechRecognition manages its own)
-      stream.getTracks().forEach(t => t.stop());
+      micStreamRef.current = stream;
       setMicAllowed(true);
       return true;
     } catch {
@@ -580,16 +584,23 @@ export default function JarvisPage() {
   }, []);
 
   // ---- ALWAYS-ON RECOGNITION ----
+  const restartCountRef = useRef(0);
+
   const startRecognition = useCallback(() => {
     const SpeechAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechAPI) return;
 
-    if (recognitionRef.current) { try { recognitionRef.current.abort(); } catch {} }
+    // Abort any existing recognition cleanly
+    if (recognitionRef.current) {
+      try { recognitionRef.current.onend = null; recognitionRef.current.abort(); } catch {}
+      recognitionRef.current = null;
+    }
 
     const recognition = new SpeechAPI();
     recognition.lang = lang;
     recognition.continuous = true;
     recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
     recognitionRef.current = recognition;
     isListeningRef.current = true;
 
@@ -597,6 +608,9 @@ export default function JarvisPage() {
     let wakeWordCooldown = false;
 
     recognition.onresult = (event: any) => {
+      // Reset restart counter on any successful result — recognition is working
+      restartCountRef.current = 0;
+
       if (stateRef.current === "paused") return;
 
       let interim = "", newFinal = "";
@@ -645,43 +659,121 @@ export default function JarvisPage() {
     };
 
     recognition.onerror = (event: any) => {
-      if (event.error === "not-allowed") {
+      const err = event.error;
+      if (err === "not-allowed" || err === "service-not-allowed") {
         isListeningRef.current = false;
         setMicAllowed(false);
         setJarvisText("Microphone blocked. Click the lock icon in Chrome's address bar → allow Microphone → reload.");
+        return;
       }
+      // For "no-speech", "audio-capture", "network" — let onend handle restart
+      // "aborted" means we intentionally stopped — ignore
     };
 
     recognition.onend = () => {
-      if (isListeningRef.current && stateRef.current !== "paused") {
-        try { recognition.start(); } catch {
-          setTimeout(() => { try { recognition.start(); } catch { startRecognition(); } }, 100);
+      if (!isListeningRef.current || stateRef.current === "paused") return;
+
+      // Exponential backoff restart to avoid rapid loops
+      restartCountRef.current++;
+      const delay = Math.min(100 * Math.pow(2, restartCountRef.current - 1), 5000);
+
+      setTimeout(() => {
+        if (!isListeningRef.current || stateRef.current === "paused") return;
+        try {
+          recognition.start();
+          // If start succeeds, reset counter after a beat
+          setTimeout(() => { if (recognitionRef.current === recognition) restartCountRef.current = Math.max(0, restartCountRef.current - 1); }, 1000);
+        } catch {
+          // If start fails, do a full restart with fresh instance
+          startRecognition();
         }
-      }
+      }, delay);
     };
 
-    try { recognition.start(); } catch {}
+    try {
+      recognition.start();
+      restartCountRef.current = 0;
+    } catch {
+      // If start fails immediately, retry with backoff
+      setTimeout(() => startRecognition(), 500);
+    }
   }, [lang, stopSpeaking, sendToJarvis]);
 
-  // Always start recognition on mount — no waiting for permission check
+  // Keep the ref in sync so resumeJarvis can call startRecognition without circular deps
+  useEffect(() => { startRecognitionRef.current = startRecognition; }, [startRecognition]);
+
+  // On mount: check if mic permission is already granted (no prompt), then auto-start
   useEffect(() => {
     if (!user) return;
-    // Try to start immediately — SpeechRecognition will prompt for mic if needed
-    setMicAllowed(true);
-    startRecognition();
-    return () => { isListeningRef.current = false; try { recognitionRef.current?.abort(); } catch {} };
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // navigator.permissions.query doesn't prompt — it just checks current state
+        const result = await navigator.permissions.query({ name: "microphone" as PermissionName });
+        if (cancelled) return;
+
+        if (result.state === "granted") {
+          // Already granted — get a stream to keep permission alive, then start recognition
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+            micStreamRef.current = stream;
+            setMicAllowed(true);
+            startRecognition();
+          } catch {
+            setMicAllowed(false);
+          }
+        } else if (result.state === "denied") {
+          setMicAllowed(false);
+          setJarvisText("Microphone blocked. Click the lock icon in Chrome's address bar → allow Microphone → reload.");
+        } else {
+          // "prompt" state — don't auto-request, wait for user gesture (click "Initialize Jarvis")
+          setMicAllowed(null);
+        }
+
+        // Listen for permission changes (user toggles in browser settings)
+        result.onchange = () => {
+          if (result.state === "granted" && !cancelled) {
+            setMicAllowed(true);
+            if (!isListeningRef.current) startRecognition();
+          } else if (result.state === "denied") {
+            setMicAllowed(false);
+            isListeningRef.current = false;
+            try { recognitionRef.current?.abort(); } catch {}
+          }
+        };
+      } catch {
+        // permissions.query not supported — wait for user gesture
+        setMicAllowed(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      isListeningRef.current = false;
+      try { if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.abort(); } } catch {}
+      // Clean up mic stream on unmount
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    };
   }, [user, startRecognition]);
 
   // ---- CLAP DETECTION (double clap to wake) ----
+  // Only start clap detection once mic is already allowed (reuse the existing stream)
   useEffect(() => {
-    if (!user) return;
+    if (!user || micAllowed !== true) return;
     let cancelled = false;
     let retryCount = 0;
 
     async function startClapDetection() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        // Reuse existing mic stream if available, otherwise request a new one
+        let stream = micStreamRef.current;
+        if (!stream || !stream.active) {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+          if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        }
         clapStreamRef.current = stream;
 
         const audioCtx = new AudioContext();
@@ -770,10 +862,10 @@ export default function JarvisPage() {
       cancelled = true;
       clearTimeout(timer);
       if (clapAnimRef.current) cancelAnimationFrame(clapAnimRef.current);
-      clapStreamRef.current?.getTracks().forEach(t => t.stop());
+      // Don't stop the shared mic stream — only stop clap-specific resources
       clapCtxRef.current?.close().catch(() => {});
     };
-  }, [user]);
+  }, [user, micAllowed]);
 
   // Listen for clap wake event
   useEffect(() => {
@@ -793,8 +885,10 @@ export default function JarvisPage() {
     if (micAllowed !== true) {
       const granted = await requestMicPermission();
       if (!granted) return;
-      // Start recognition now that we have permission
+      // Start recognition now that we have permission from user gesture
       startRecognition();
+      // Small delay to let recognition initialize before sending wake command
+      await new Promise(r => setTimeout(r, 300));
     }
     if (state === "sleeping" || state === "paused") {
       if (state === "paused") resumeJarvis();
@@ -819,7 +913,11 @@ export default function JarvisPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col items-center justify-center relative overflow-hidden" onClick={unlockAudio}>
+    <div className="h-[calc(100vh-8rem)] flex flex-col items-center justify-center relative overflow-hidden" onClick={() => {
+      unlockAudio();
+      // On any click, try to get mic permission if not yet granted (user gesture context)
+      if (micAllowed === null) requestMicPermission().then(ok => { if (ok && !isListeningRef.current) startRecognition(); });
+    }}>
       {/* Background */}
       <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)", backgroundSize: "40px 40px" }} />
 

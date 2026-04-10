@@ -12,6 +12,8 @@ import {
   TrendingUp, Package, ShieldCheck, AlertTriangle, Cloud, Calendar,
   Zap, Activity, DollarSign, BarChart3, ArrowUpRight, ArrowDownRight,
   Tag, Radio, Layers, Sun, Snowflake, ThermometerSun, Clock,
+  ExternalLink, Megaphone, Newspaper, ShoppingBag, RefreshCw,
+  FileDown,
 } from "lucide-react";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -31,6 +33,9 @@ export default function DashboardPage() {
   const [weather, setWeather] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("topDemand");
+  const [promoResults, setPromoResults] = useState<any>(null);
+  const [promoCategory, setPromoCategory] = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -50,6 +55,32 @@ export default function DashboardPage() {
       } catch {} finally { setLoading(false); }
     })();
   }, [user]);
+
+  // Auto-rotate promos through inventory categories every 1 hour
+  useEffect(() => {
+    if (!data) return;
+    const cats: string[] = (data.categoryDemand || []).map((c: any) => c.category).filter(Boolean);
+    if (cats.length === 0) return;
+
+    const fetchPromo = async () => {
+      const hourIndex = Math.floor(Date.now() / 3600000) % cats.length;
+      const cat = cats[hourIndex];
+      setPromoCategory(cat);
+      setPromoLoading(true);
+      try {
+        const res = await fetch("/api/search-promos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: cat }),
+        });
+        if (res.ok) setPromoResults(await res.json());
+      } catch {} finally { setPromoLoading(false); }
+    };
+
+    fetchPromo();
+    const interval = setInterval(fetchPromo, 3600000); // refresh every 1 hour
+    return () => clearInterval(interval);
+  }, [data]);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" /></div>;
 
@@ -74,14 +105,109 @@ export default function DashboardPage() {
   const genTime = data?.generatedAt ? new Date(data.generatedAt) : new Date();
   const timeStr = genTime.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
+  const exportPDF = () => {
+    const storeName = data?.store?.store_name || "My Store";
+    const storeCity = data?.store?.city || "";
+    const stockoutProds = data?.stockoutProducts?.filter((p: any) => p.probability > 10) || [];
+    const volProds = data?.volatilityProducts || [];
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Forecastify Report - ${storeName}</title>
+<style>
+  @page { size:A4; margin:12mm 14mm; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; font-size:11px; line-height:1.5; background:#fff; }
+  .header { background:linear-gradient(135deg,#312e81,#6366f1,#7c3aed); color:#fff; padding:24px 28px; margin:-12mm -14mm 0; }
+  .header h1 { font-size:22px; font-weight:700; } .header p { opacity:0.85; font-size:11px; margin-top:4px; }
+  .header .meta { display:flex; gap:16px; margin-top:10px; font-size:10px; opacity:0.9; }
+  .section { margin-top:18px; } .section h2 { font-size:14px; font-weight:700; color:#312e81; border-bottom:2px solid #e2e8f0; padding-bottom:4px; margin-bottom:10px; }
+  .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; }
+  .card .label { font-size:9px; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; } .card .val { font-size:18px; font-weight:700; color:#1e293b; margin-top:2px; }
+  .card .sub { font-size:9px; color:#94a3b8; margin-top:2px; }
+  table { width:100%; border-collapse:collapse; font-size:10px; } th { text-align:left; padding:6px 8px; background:#f1f5f9; border-bottom:2px solid #e2e8f0; font-weight:600; color:#475569; }
+  td { padding:6px 8px; border-bottom:1px solid #f1f5f9; } tr:nth-child(even) { background:#fafafa; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:9px; font-weight:600; }
+  .red { background:#fef2f2; color:#dc2626; } .amber { background:#fffbeb; color:#d97706; } .green { background:#f0fdf4; color:#16a34a; } .blue { background:#eff6ff; color:#2563eb; }
+  .risk-bar { width:60px; height:6px; background:#e2e8f0; border-radius:3px; display:inline-block; position:relative; }
+  .risk-fill { height:100%; border-radius:3px; position:absolute; left:0; top:0; }
+  .footer { margin-top:24px; padding-top:12px; border-top:2px solid #e2e8f0; text-align:center; font-size:9px; color:#94a3b8; }
+</style></head><body>
+
+<div class="header">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <div style="width:36px;height:36px;background:linear-gradient(135deg,#6366f1,#9333ea);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;box-shadow:0 4px 12px rgba(99,102,241,0.3);">F</div>
+    <span style="font-size:18px;font-weight:700;">Forecastify</span>
+  </div>
+  <h1>Dashboard Report — ${storeName}</h1>
+  <p>AI-Powered Demand Forecasting & Inventory Intelligence</p>
+  <div class="meta"><span>Generated: ${timeStr}</span><span>City: ${storeCity}</span><span>Products: ${s.totalSKUs || 0}</span><span>Forecast Accuracy: ${s.forecastAccuracy || 0}%</span></div>
+</div>
+
+<div class="section"><h2>Key Metrics</h2>
+<div class="grid4">
+  <div class="card"><div class="label">Predicted Revenue (7d)</div><div class="val">₹${(s.predictedRevenue || 0).toLocaleString("en-IN")}</div><div class="sub">Trend: ${s.demandTrend > 0 ? "+" : ""}${s.demandTrend || 0}% vs last week</div></div>
+  <div class="card"><div class="label">Total Products</div><div class="val">${s.totalSKUs || 0}</div><div class="sub">Stock value: ₹${(s.totalInventoryValue || 0).toLocaleString("en-IN")}</div></div>
+  <div class="card"><div class="label">Forecast Accuracy</div><div class="val">${s.forecastAccuracy || 0}%</div><div class="sub">${s.totalForecastDemand || 0} units expected</div></div>
+  <div class="card"><div class="label">Active Alerts</div><div class="val">${s.activeAlerts || 0}</div><div class="sub">${s.criticalItems || 0} critical, ${s.lowItems || 0} low, ${s.overstockItems || 0} overstock</div></div>
+</div></div>
+
+<div class="section"><h2>Risk Indicators</h2>
+<div class="grid4">
+  <div class="card"><div class="label">Stockout Risk</div><div class="val">${s.stockoutRisk || 0} products</div><div class="sub">Less than 3 days stock left</div></div>
+  <div class="card"><div class="label">Demand Volatility</div><div class="val">${s.demandVolatility || 0}%</div><div class="sub">${s.demandVolatility > 25 ? "High fluctuation" : s.demandVolatility > 12 ? "Moderate" : "Stable"}</div></div>
+  <div class="card"><div class="label">Demand Trend</div><div class="val">${s.demandTrend > 0 ? "↑ +" : "↓ "}${s.demandTrend || 0}%</div><div class="sub">vs last week</div></div>
+  <div class="card"><div class="label">Overstock Risk</div><div class="val">${s.overstockItems || 0} products</div><div class="sub">Near max capacity</div></div>
+</div></div>
+
+<div class="section"><h2>Top Demand Products</h2>
+<table><thead><tr><th>Product</th><th>Category</th><th style="text-align:right">Daily Demand</th><th style="text-align:right">Weekly</th><th style="text-align:right">Stock</th><th style="text-align:right">Days Left</th><th style="text-align:right">Gap</th></tr></thead>
+<tbody>${topDemand.slice(0, 10).map((p: any) => `<tr><td><strong>${p.name}</strong></td><td>${p.category}</td><td style="text-align:right">${p.dailyDemand}/day</td><td style="text-align:right">${p.weeklyDemand}</td><td style="text-align:right">${p.currentStock} ${p.unit}</td><td style="text-align:right"><span class="${p.daysOfStock < 3 ? "red" : p.daysOfStock < 5 ? "amber" : "green"}">${p.daysOfStock}d</span></td><td style="text-align:right">${p.gap > 0 ? `<span class="badge red">+${p.gap} needed</span>` : '<span class="badge green">OK</span>'}</td></tr>`).join("")}</tbody></table></div>
+
+<div class="section"><h2>Stockout Probability</h2>
+<table><thead><tr><th>Product</th><th style="text-align:right">Stock</th><th style="text-align:right">Demand/day</th><th style="text-align:right">Days Left</th><th style="text-align:right">Probability</th></tr></thead>
+<tbody>${stockoutProds.slice(0, 10).map((p: any) => `<tr><td><strong>${p.name}</strong> <span style="color:#94a3b8">${p.category}</span></td><td style="text-align:right">${p.currentStock} ${p.unit}</td><td style="text-align:right">${p.dailyDemand}</td><td style="text-align:right"><span class="${p.daysLeft <= 2 ? "red" : p.daysLeft <= 5 ? "amber" : "green"}">${p.daysLeft}d</span></td><td style="text-align:right"><span class="badge ${p.probability >= 70 ? "red" : p.probability >= 40 ? "amber" : "green"}">${p.probability}%</span></td></tr>`).join("")}</tbody></table></div>
+
+<div class="section"><h2>Demand Volatility</h2>
+<table><thead><tr><th>Product</th><th style="text-align:right">Avg Sales/day</th><th style="text-align:right">Volatility</th><th style="text-align:center">Level</th></tr></thead>
+<tbody>${volProds.slice(0, 10).map((p: any) => `<tr><td><strong>${p.name}</strong> <span style="color:#94a3b8">(${p.dataPoints} records)</span></td><td style="text-align:right">${p.avgSales}</td><td style="text-align:right">${p.volatility}%</td><td style="text-align:center"><span class="badge ${p.level === "high" ? "red" : p.level === "medium" ? "amber" : "green"}">${p.level}</span></td></tr>`).join("")}</tbody></table></div>
+
+<div class="section"><h2>Category Breakdown</h2>
+<table><thead><tr><th>Category</th><th style="text-align:right">Stock Units</th><th style="text-align:right">Value</th><th style="text-align:right">Products</th></tr></thead>
+<tbody>${categories.map((c: any) => `<tr><td><strong>${c.category}</strong></td><td style="text-align:right">${c.stock}</td><td style="text-align:right">₹${c.value?.toLocaleString("en-IN")}</td><td style="text-align:right">${c.products}</td></tr>`).join("")}</tbody></table></div>
+
+<div class="section"><h2>Business Insights</h2>
+<div class="grid4">
+  <div class="card"><div class="label">Weekend Sales</div><div class="val">${s.avgWeekendSales || 0} avg/product</div></div>
+  <div class="card"><div class="label">Weekday Sales</div><div class="val">${s.avgWeekdaySales || 0} avg/product</div></div>
+  <div class="card"><div class="label">Hot Day Sales</div><div class="val">${s.avgHotSales || 0} avg (>35°C)</div></div>
+  <div class="card"><div class="label">Cold Day Sales</div><div class="val">${s.avgColdSales || 0} avg (<20°C)</div></div>
+</div></div>
+
+${events.length > 0 ? `<div class="section"><h2>Upcoming Events</h2>
+<table><thead><tr><th>Event</th><th>Date</th><th>Type</th><th style="text-align:right">Demand Impact</th></tr></thead>
+<tbody>${events.slice(0, 6).map((e: any) => `<tr><td><strong>${e.event_name}</strong></td><td>${e.start_date}</td><td>${e.event_type}</td><td style="text-align:right"><span class="badge green">+${e.demand_impact_percent}%</span></td></tr>`).join("")}</tbody></table></div>` : ""}
+
+<div class="footer">
+  <p>Forecastify — AI-Powered Demand Forecasting for Retail | Generated on ${timeStr}</p>
+  <p style="margin-top:4px;">This report contains predictions based on historical data, weather patterns, and market signals. Actual results may vary.</p>
+</div>
+</body></html>`;
+
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 500); }
+  };
+
   return (
     <div className="space-y-5">
       {/* Data source info */}
       <div className="flex items-center justify-between text-xs text-muted-foreground bg-secondary/50 rounded-lg px-4 py-2 flex-wrap gap-1">
         <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Last updated: {timeStr}</span>
-        <span>Data: {s.historicDataDays || 0} sales records from {s.dataSource || "your city"} | {s.forecastProductCount || 0} products forecasted</span>
-        {matchedStore && <span className="flex items-center gap-1">Store: {matchedStore.store_name} ({matchedStore.store_type}, {matchedStore.store_size_sqft} sqft)</span>}
-        {testInputInfo.total > 0 && <span className="flex items-center gap-1">Test Inputs: {testInputInfo.fulfilled}/{testInputInfo.total} predicted</span>}
+        <div className="flex items-center gap-3">
+          <span>Data: {s.historicDataDays || 0} sales records from {s.dataSource || "your city"} | {s.forecastProductCount || 0} products forecasted</span>
+          <button onClick={exportPDF} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium transition-colors">
+            <FileDown className="w-3.5 h-3.5" /> Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Stat Cards — simple Hindi+English labels */}
@@ -95,6 +221,84 @@ export default function DashboardPage() {
         <StatCard icon={AlertTriangle} title={t("stat.alerts")} value={String(s.activeAlerts || 0)}
           change={t("stat.alertBreakdown", { critical: s.criticalItems || 0, low: s.lowItems || 0, overstock: s.overstockItems || 0 })} changeType={s.criticalItems > 0 ? "negative" : "neutral"} color="bg-red-500" />
       </div>
+
+      {/* Auto-rotating Market Insights for inventory categories */}
+      {(promoResults || promoLoading) && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-foreground flex items-center gap-2">
+              <Megaphone className="w-4 h-4 text-pink-500" /> Market Insights — <span className="text-primary">{promoCategory}</span>
+            </h3>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <RefreshCw className={`w-3.5 h-3.5 ${promoLoading ? "animate-spin" : ""}`} /> Auto-updates every hour
+            </span>
+          </div>
+          {promoLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-linear-to-br from-green-500/5 to-green-500/10 border border-green-500/20 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+                  <ShoppingBag className="w-4 h-4 text-green-500" /> Offers & Deals
+                </h4>
+                {promoResults?.offers?.length > 0 ? (
+                  <div className="space-y-3">
+                    {promoResults.offers.slice(0, 3).map((item: any, i: number) => (
+                      <a key={i} href={item.link} target="_blank" rel="noopener noreferrer" className="block group">
+                        <p className="text-sm font-medium text-foreground group-hover:text-green-500 transition-colors line-clamp-2 flex items-start gap-1">
+                          {item.title}
+                          <ExternalLink className="w-3 h-3 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.snippet}</p>
+                      </a>
+                    ))}
+                  </div>
+                ) : <p className="text-sm text-muted-foreground">No offers found</p>}
+              </div>
+
+              <div className="bg-linear-to-br from-amber-500/5 to-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+                  <Megaphone className="w-4 h-4 text-amber-500" /> Promotions & Ads
+                </h4>
+                {promoResults?.promotions?.length > 0 ? (
+                  <div className="space-y-3">
+                    {promoResults.promotions.slice(0, 3).map((item: any, i: number) => (
+                      <a key={i} href={item.link} target="_blank" rel="noopener noreferrer" className="block group">
+                        <p className="text-sm font-medium text-foreground group-hover:text-amber-500 transition-colors line-clamp-2 flex items-start gap-1">
+                          {item.title}
+                          <ExternalLink className="w-3 h-3 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.snippet}</p>
+                      </a>
+                    ))}
+                  </div>
+                ) : <p className="text-sm text-muted-foreground">No promotions found</p>}
+              </div>
+
+              <div className="bg-linear-to-br from-blue-500/5 to-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+                  <Newspaper className="w-4 h-4 text-blue-500" /> Market News
+                </h4>
+                {promoResults?.news?.length > 0 ? (
+                  <div className="space-y-3">
+                    {promoResults.news.slice(0, 3).map((item: any, i: number) => (
+                      <a key={i} href={item.link} target="_blank" rel="noopener noreferrer" className="block group">
+                        <p className="text-sm font-medium text-foreground group-hover:text-blue-500 transition-colors line-clamp-2 flex items-start gap-1">
+                          {item.title}
+                          <ExternalLink className="w-3 h-3 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.snippet}</p>
+                      </a>
+                    ))}
+                  </div>
+                ) : <p className="text-sm text-muted-foreground">No news found</p>}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Risk Indicators — clear explanations */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

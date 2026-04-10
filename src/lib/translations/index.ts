@@ -7,7 +7,9 @@ function makeLang(overrides: Record<string, string>): Record<string, string> {
 }
 
 const mr = makeLang({
-  "nav.overview": "ओव्हरव्ह्यू", "nav.purchaseList": "खरेदी यादी", "nav.forecasts": "अंदाज",
+  "nav.overview": "ओव्हरव्ह्यू", "nav.purchaseList": "खरेदी यादी", "nav.marketInsights": "मार्केट इनसाइट्स",
+  "nav.modelAccuracy": "मॉडेल अचूकता", "nav.expiryRisk": "एक्सपायरी रिस्क", "nav.inventoryHealth": "हेल्थ स्कोअर", "nav.reorderPlanner": "रीऑर्डर प्लॅनर",
+  "nav.forecasts": "अंदाज",
   "nav.inventory": "इन्व्हेंटरी", "nav.alerts": "सूचना", "nav.settings": "सेटिंग्ज",
   "nav.signOut": "बाहेर पडा", "nav.addProduct": "प्रॉडक्ट जोडा",
   "stat.expectedSales": "पुढील 7 दिवसांची विक्री", "stat.vsLastWeek": "मागील आठवड्यापेक्षा {{val}}%",
@@ -29,7 +31,8 @@ const mr = makeLang({
 });
 
 const ta = makeLang({
-  "nav.overview": "மேலோட்டம்", "nav.purchaseList": "கொள்முதல் பட்டியல்",
+  "nav.overview": "மேலோட்டம்", "nav.purchaseList": "கொள்முதல் பட்டியல்", "nav.marketInsights": "சந்தை நுண்ணறிவு",
+  "nav.modelAccuracy": "மாடல் துல்லியம்", "nav.expiryRisk": "காலாவதி ஆபத்து", "nav.inventoryHealth": "ஹெல்த் ஸ்கோர்", "nav.reorderPlanner": "மறு ஆர்டர்",
   "nav.inventory": "சரக்கு", "nav.alerts": "எச்சரிக்கைகள்", "nav.settings": "அமைப்புகள்",
   "nav.signOut": "வெளியேறு", "nav.addProduct": "பொருள் சேர்",
   "stat.expectedSales": "எதிர்பார்க்கப்படும் விற்பனை (7 நாள்)", "stat.totalProducts": "மொத்த பொருட்கள்",
@@ -42,7 +45,8 @@ const ta = makeLang({
 });
 
 const te = makeLang({
-  "nav.overview": "అవలోకనం", "nav.purchaseList": "కొనుగోలు జాబితా",
+  "nav.overview": "అవలోకనం", "nav.purchaseList": "కొనుగోలు జాబితా", "nav.marketInsights": "మార్కెట్ ఇన్‌సైట్స్",
+  "nav.modelAccuracy": "మోడల్ ఖచ్చితత్వం", "nav.expiryRisk": "ఎక్స్‌పైరీ రిస్క్", "nav.inventoryHealth": "హెల్త్ స్కోర్", "nav.reorderPlanner": "రీఆర్డర్ ప్లానర్",
   "nav.inventory": "ఇన్వెంటరీ", "nav.alerts": "హెచ్చరికలు", "nav.settings": "సెట్టింగ్‌లు",
   "nav.signOut": "లాగ్ అవుట్", "nav.addProduct": "ఉత్పత్తి జోడించు",
   "stat.expectedSales": "ఊహించిన అమ్మకాలు (7 రోజులు)", "stat.totalProducts": "మొత్తం ఉత్పత్తులు",
@@ -55,7 +59,8 @@ const te = makeLang({
 });
 
 const kn = makeLang({
-  "nav.overview": "ಅವಲೋಕನ", "nav.purchaseList": "ಖರೀದಿ ಪಟ್ಟಿ",
+  "nav.overview": "ಅವಲೋಕನ", "nav.purchaseList": "ಖರೀದಿ ಪಟ್ಟಿ", "nav.marketInsights": "ಮಾರುಕಟ್ಟೆ ಒಳನೋಟಗಳು",
+  "nav.modelAccuracy": "ಮಾಡೆಲ್ ನಿಖರತೆ", "nav.expiryRisk": "ಎಕ್ಸ್‌ಪೈರಿ ಅಪಾಯ", "nav.inventoryHealth": "ಹೆಲ್ತ್ ಸ್ಕೋರ್", "nav.reorderPlanner": "ರೀಆರ್ಡರ್ ಪ್ಲಾನರ್",
   "nav.inventory": "ಸರಕು", "nav.alerts": "ಎಚ್ಚರಿಕೆ", "nav.settings": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
   "nav.signOut": "ಲಾಗ್ ಔಟ್", "nav.addProduct": "ಉತ್ಪನ್ನ ಸೇರಿಸಿ",
   "stat.expectedSales": "ನಿರೀಕ್ಷಿತ ಮಾರಾಟ (7 ದಿನ)", "stat.totalProducts": "ಒಟ್ಟು ಉತ್ಪನ್ನಗಳು",
@@ -67,7 +72,8 @@ const kn = makeLang({
 });
 
 const bn = makeLang({
-  "nav.overview": "ওভারভিউ", "nav.purchaseList": "কেনাকাটার তালিকা",
+  "nav.overview": "ওভারভিউ", "nav.purchaseList": "কেনাকাটার তালিকা", "nav.marketInsights": "মার্কেট ইনসাইটস",
+  "nav.modelAccuracy": "মডেল নির্ভুলতা", "nav.expiryRisk": "মেয়াদ ঝুঁকি", "nav.inventoryHealth": "হেলথ স্কোর", "nav.reorderPlanner": "রিঅর্ডার প্ল্যানার",
   "nav.inventory": "মজুত", "nav.alerts": "সতর্কতা", "nav.settings": "সেটিংস",
   "nav.signOut": "লগ আউট", "nav.addProduct": "পণ্য যোগ করুন",
   "stat.expectedSales": "প্রত্যাশিত বিক্রি (৭ দিন)", "stat.totalProducts": "মোট পণ্য",
@@ -79,7 +85,8 @@ const bn = makeLang({
 });
 
 const gu = makeLang({
-  "nav.overview": "ઓવરવ્યૂ", "nav.purchaseList": "ખરીદી યાદી",
+  "nav.overview": "ઓવરવ્યૂ", "nav.purchaseList": "ખરીદી યાદી", "nav.marketInsights": "માર્કેટ ઇનસાઇટ્સ",
+  "nav.modelAccuracy": "મોડેલ ચોકસાઈ", "nav.expiryRisk": "એક્સપાયરી રિસ્ક", "nav.inventoryHealth": "હેલ્થ સ્કોર", "nav.reorderPlanner": "રીઓર્ડર પ્લાનર",
   "nav.inventory": "ઇન્વેન્ટરી", "nav.alerts": "ચેતવણી", "nav.settings": "સેટિંગ્સ",
   "nav.signOut": "લોગ આઉટ", "nav.addProduct": "ઉત્પાદન ઉમેરો",
   "stat.expectedSales": "અપેક્ષિત વેચાણ (7 દિવસ)", "stat.totalProducts": "કુલ ઉત્પાદનો",
