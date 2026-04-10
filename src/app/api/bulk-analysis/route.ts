@@ -28,6 +28,7 @@ interface ProductInput {
   category: string;
   quantity?: number;
   unit?: string;
+  price?: number;
 }
 
 export async function POST(request: Request) {
@@ -84,7 +85,7 @@ EVENTS: ${eventsStr}
 NEXT 7 DAYS: ${next7.map(d => d.day + " " + d.date).join(", ")}
 
 PURCHASE LIST (what shopkeeper wants to buy):
-${products.map((p: ProductInput, i: number) => `${i + 1}. ${p.name} (${p.category}) — wants ${p.quantity || "?"} ${p.unit || "units"}`).join("\n")}
+${products.map((p: ProductInput, i: number) => `${i + 1}. ${p.name} (${p.category}) — wants ${p.quantity || "?"} ${p.unit || "units"} at ₹${p.price || "?"} each`).join("\n")}
 
 CURRENT INVENTORY:
 ${invStr}

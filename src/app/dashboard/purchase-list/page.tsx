@@ -236,7 +236,7 @@ ${!forPrint ? "</div>" : ""}
           <div className="bg-card border border-border rounded-2xl p-5">
             <h4 className="font-semibold text-foreground flex items-center gap-2 mb-3"><Clipboard className="w-4 h-4 text-emerald-500" /> Or type / paste your list</h4>
             <textarea value={textInput} onChange={(e) => setTextInput(e.target.value)}
-              placeholder={"Maggi 50 packets\nAmul Butter 20 pcs\nBisleri 1L 100 bottles\nTata Salt 30 kg\nLays 40 packets"}
+              placeholder={"Maggi 50 packets ₹14 each\nAmul Butter 20 pcs ₹56\nBisleri 1L 100 bottles ₹20\nTata Salt 30 kg ₹28\nLays 40 packets ₹10"}
               rows={6} className="w-full px-4 py-3 bg-secondary border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm font-mono resize-none" />
             <button onClick={() => handleExtract()} disabled={extracting || !textInput.trim()}
               className="mt-3 px-6 py-2.5 bg-emerald-500 text-white rounded-xl font-semibold hover:bg-emerald-600 disabled:opacity-50 flex items-center gap-2">
@@ -280,8 +280,9 @@ ${!forPrint ? "</div>" : ""}
                       <p className="text-xs text-muted-foreground">{p.category}{p.brand ? ` • ${p.brand}` : ""}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-4">
                     <span className="text-sm font-semibold text-foreground">{p.quantity || "?"} {p.unit || "pcs"}</span>
+                    {p.price > 0 && <span className="text-sm text-emerald-600 font-medium">₹{p.price}</span>}
                     <button onClick={() => removeProduct(i)} className="text-muted-foreground hover:text-red-500"><X className="w-4 h-4" /></button>
                   </div>
                 </div>
