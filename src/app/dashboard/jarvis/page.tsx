@@ -663,21 +663,12 @@ export default function JarvisPage() {
     try { recognition.start(); } catch {}
   }, [lang, stopSpeaking, sendToJarvis]);
 
-  // Check mic permission on mount (without prompting)
+  // Always start recognition on mount — no waiting for permission check
   useEffect(() => {
     if (!user) return;
-    // Check if permission was already granted (no prompt)
-    navigator.permissions?.query({ name: "microphone" as PermissionName }).then(result => {
-      if (result.state === "granted") {
-        setMicAllowed(true);
-        startRecognition();
-      } else if (result.state === "denied") {
-        setMicAllowed(false);
-      }
-      // If "prompt" — wait for user click
-    }).catch(() => {
-      // permissions API not supported — wait for user click
-    });
+    // Try to start immediately — SpeechRecognition will prompt for mic if needed
+    setMicAllowed(true);
+    startRecognition();
     return () => { isListeningRef.current = false; try { recognitionRef.current?.abort(); } catch {} };
   }, [user, startRecognition]);
 
@@ -685,16 +676,11 @@ export default function JarvisPage() {
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    let retryCount = 0;
 
     async function startClapDetection() {
-      // Only start if mic is already allowed
       try {
-        const permResult = await navigator.permissions?.query({ name: "microphone" as PermissionName });
-        if (permResult?.state !== "granted") return;
-      } catch { return; }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         clapStreamRef.current = stream;
 
@@ -702,14 +688,16 @@ export default function JarvisPage() {
         clapCtxRef.current = audioCtx;
         const source = audioCtx.createMediaStreamSource(stream);
         const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.3;
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.1; // fast response for sharp sounds
         source.connect(analyser);
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
         let lastClapTime = 0;
         let clapCount = 0;
         let cooldown = false;
+        let baselineRms = 0;
+        let sampleCount = 0;
 
         function detect() {
           if (cancelled) return;
@@ -721,47 +709,62 @@ export default function JarvisPage() {
             return;
           }
 
-          analyser.getByteFrequencyData(dataArray);
-          // Calculate RMS volume
+          analyser.getByteTimeDomainData(dataArray);
+          // Calculate RMS from time domain (better for transient detection like claps)
           let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i] * dataArray[i];
-          const rms = Math.sqrt(sum / dataArray.length);
+          for (let i = 0; i < dataArray.length; i++) {
+            const v = (dataArray[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / dataArray.length) * 100;
 
-          // Clap = sharp spike above threshold
+          // Build baseline from first 60 frames (~1 second)
+          if (sampleCount < 60) {
+            baselineRms = (baselineRms * sampleCount + rms) / (sampleCount + 1);
+            sampleCount++;
+            return;
+          }
+
+          // Clap = sudden spike 3x above baseline (works for soft claps too)
+          const threshold = Math.max(8, baselineRms * 3);
           const now = Date.now();
-          if (rms > 120 && !cooldown) {
+
+          if (rms > threshold && !cooldown) {
             cooldown = true;
             clapCount++;
 
             if (clapCount === 1) {
               lastClapTime = now;
-            } else if (clapCount >= 2 && now - lastClapTime < 1000) {
+            } else if (clapCount >= 2 && now - lastClapTime < 1200) {
               // Double clap detected!
               clapCount = 0;
-              // Trigger wake via sendToJarvis
-              const wakeEvent = new CustomEvent("jarvis-clap-wake");
-              window.dispatchEvent(wakeEvent);
+              window.dispatchEvent(new CustomEvent("jarvis-clap-wake"));
             }
 
-            // Reset if too slow between claps
-            if (now - lastClapTime > 1200) {
+            // Reset if gap too long
+            if (now - lastClapTime > 1500) {
               clapCount = 1;
               lastClapTime = now;
             }
 
-            // Cooldown to avoid counting one clap as multiple
-            setTimeout(() => { cooldown = false; }, 250);
+            setTimeout(() => { cooldown = false; }, 200);
           }
+
+          // Slowly adapt baseline to ambient noise
+          baselineRms = baselineRms * 0.995 + rms * 0.005;
         }
 
         detect();
       } catch {
-        // Mic not available for clap detection — silent fail
+        // Retry after delay if mic not ready yet
+        if (!cancelled && retryCount < 3) {
+          retryCount++;
+          setTimeout(startClapDetection, 3000);
+        }
       }
     }
 
-    // Small delay to let other audio init first
-    const timer = setTimeout(startClapDetection, 2000);
+    const timer = setTimeout(startClapDetection, 1500);
 
     return () => {
       cancelled = true;
