@@ -124,7 +124,10 @@ export async function POST(request: Request) {
       return `${i + 1}. ${p.name}|${p.category}|want:${p.quantity || "?"}${p.unit || "pcs"}|₹${p.price || "?"}|inStock:${inv ? inv.quantity + inv.unit : "0"}`;
     }).join("\n");
 
-    const systemMsg = `You are a retail analyst. Return ONLY valid JSON. All quantities must be WHOLE INTEGERS (no decimals). estimatedCost = recommendedQty × price per unit.`;
+    const systemMsg = `You are a retail analyst for small Indian kirana stores. Return ONLY valid JSON. All quantities INTEGERS.
+PRICING: "price" = price of ONE unit (1 packet, 1 bottle, 1 kg). NOT total cost.
+Examples: Maggi 1 packet = ₹14. Oil 1L bottle = ₹180. Salt 1kg = ₹28. Milk 500ml = ₹30. Biscuit 1 pack = ₹10.
+estimatedCost = recommendedQty × price_per_unit. If Oil recommended 34 bottles at ₹180 each = ₹6120, NOT ₹30600.`;
 
     const userMsg = `Store: "${store?.store_name}" (${store?.store_category}) at ${location || store?.store_address || city}, ${state}
 Weather NOW: ${weather ? `${weather.temp}°C ${weather.description} Humidity:${weather.humidity}%` : "N/A"}
@@ -140,14 +143,16 @@ Return JSON:
 {"analysis":[{"name":"Product","category":"Cat","requestedQty":10,"unit":"pcs","price":50,"currentInventory":0,"dailyDemand":5,"weeklyDemand":35,"recommendedQty":40,"adjustmentReason":"why","priority":"High/Medium/Low","priorityReason":"why","estimatedCost":2000,"demandLevel":"High/Medium/Low","dailyBreakdown":[5,5,6,6,7,8,6]}],"buyFirstList":["Product — reason"],"totalEstimatedCost":0,"suggestions":["tip"]}
 
 RULES:
-- ALL numbers must be INTEGERS. No 35.75, use 36. No 5.5, use 6. Round UP.
+- ALL numbers INTEGERS. Round UP decimals.
 - dailyBreakdown = 7 integers for ${next7.map(d => d.day.slice(0, 3)).join(",")}.
 - Use historic data as baseline. Hot weather (${weather?.temp || "?"}°C) boosts beverages/ice cream.
-- currentInventory = look up from inventory matches above. If not found, use 0.
-- estimatedCost = recommendedQty × price. Must be > 0 if price > 0.
-- recommendedQty = weeklyDemand + 20% buffer - currentInventory. Round UP to integer.
-- price = use from purchase list. If "?", estimate Indian MRP.
-- Priority HIGH: stock < 2 days of demand. MEDIUM: < 5 days. LOW: sufficient.`;
+- currentInventory = from inventory matches above. 0 if not found.
+- "price" = PER UNIT price (1 packet, 1 bottle, 1 kg). NOT bulk/total price.
+  Common Indian prices: Maggi=₹14, Salt 1kg=₹28, Oil 1L=₹180, Milk 500ml=₹30, Biscuit=₹10, Soap=₹30, Chips=₹10, Water 1L=₹20
+  If user gave price, USE THAT. If "?", estimate realistic MRP of 1 unit.
+- estimatedCost = recommendedQty × price_per_unit. Example: 34 bottles × ₹20 = ₹680.
+- recommendedQty = weeklyDemand + 20% buffer - currentInventory. Round UP.
+- Priority HIGH: stock < 2 days demand. MEDIUM: < 5 days. LOW: sufficient.`;
 
     let completion: any = null;
     for (let i = 0; i < GROQ_KEYS.length; i++) {
@@ -203,10 +208,23 @@ RULES:
         item.recommendedQty = Math.round(item.recommendedQty || item.requestedQty || 0);
         item.price = Math.round(item.price || 0);
 
-        // Fix cost
-        if (!item.estimatedCost || item.estimatedCost === 0) {
+        // Fix cost — always recalculate to prevent inflated values
+        item.estimatedCost = item.recommendedQty * item.price;
+
+        // Sanity check: if cost per unit > ₹1000, price is probably wrong (bulk price used instead of unit)
+        if (item.price > 1000 && item.recommendedQty > 1) {
+          // Likely a bulk price mistake — check common product prices
+          const commonPrices: Record<string, number> = {
+            oil: 180, salt: 28, sugar: 45, atta: 280, dal: 160, milk: 30,
+            butter: 56, maggi: 14, biscuit: 10, chips: 10, soap: 30, water: 20,
+          };
+          const nameLC = item.name.toLowerCase();
+          for (const [key, val] of Object.entries(commonPrices)) {
+            if (nameLC.includes(key)) { item.price = val; break; }
+          }
           item.estimatedCost = item.recommendedQty * item.price;
         }
+
         item.estimatedCost = Math.round(item.estimatedCost);
         totalCost += item.estimatedCost;
 
