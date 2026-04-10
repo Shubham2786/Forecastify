@@ -28,6 +28,8 @@ export default function PurchaseListPage() {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [weather, setWeather] = useState<any>(null);
+  const [weatherForecast, setWeatherForecast] = useState<any[]>([]);
+  const [location, setLocation] = useState("");
   const [fileName, setFileName] = useState("");
   const [generatedAt, setGeneratedAt] = useState("");
 
@@ -35,8 +37,12 @@ export default function PurchaseListPage() {
     (async () => {
       try {
         const pos = await new Promise<GeolocationPosition>((r, j) => navigator.geolocation.getCurrentPosition(r, j, { timeout: 10000 }));
-        const res = await fetch(`/api/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`);
-        if (res.ok) { const d = await res.json(); setWeather(d.current); }
+        const [wRes, lRes] = await Promise.all([
+          fetch(`/api/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`),
+          fetch(`/api/location?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`),
+        ]);
+        if (wRes.ok) { const d = await wRes.json(); setWeather(d.current); setWeatherForecast(d.forecast || []); }
+        if (lRes.ok) { const d = await lRes.json(); setLocation(d.formattedAddress || d.city || ""); }
       } catch {}
     })();
   }, []);
@@ -79,7 +85,7 @@ export default function PurchaseListPage() {
       const res = await fetch("/api/bulk-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products, userId: user.id, weather }),
+        body: JSON.stringify({ products, userId: user.id, weather, weatherForecast, location }),
       });
       const data = await res.json();
       if (data.analysis) {
