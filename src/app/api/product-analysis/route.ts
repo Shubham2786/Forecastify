@@ -33,10 +33,23 @@ export async function POST(request: Request) {
       return Response.json({ error: "productName and userId required" }, { status: 400 });
     }
 
-    // 1. Product from inventory
-    const { data: products } = await supabase
+    // 1. Check if product exists in inventory OR products table
+    const { data: invProducts } = await supabase
       .from("inventory").select("*").eq("store_id", userId).ilike("product_name", `%${productName}%`);
-    const product = products?.[0] || null;
+    const product = invProducts?.[0] || null;
+
+    // Also check the products catalog table
+    const { data: catalogProducts } = await supabase
+      .from("products").select("product_name").ilike("product_name", `%${productName}%`).limit(1);
+
+    // Also check historic_sales for this product
+    const { data: salesCheck } = await supabase
+      .from("historic_sales").select("product_name").ilike("product_name", `%${productName}%`).limit(1);
+
+    // If product not found in any table, reject
+    if (!product && !catalogProducts?.length && !salesCheck?.length) {
+      return Response.json({ error: `"${productName}" is not a valid product. Please search for a product that exists in your inventory or catalog.` }, { status: 400 });
+    }
 
     // 2. Store profile
     const { data: store } = await supabase

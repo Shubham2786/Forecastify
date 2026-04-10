@@ -14,7 +14,7 @@ import {
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   "Dairy", "Beverages", "Snacks", "Groceries", "Ice Cream", "Personal Care",
   "Household", "Biscuits", "Chocolates", "Instant Food", "Masala & Spices", "Oils",
 ];
@@ -42,6 +42,24 @@ export default function CategoryAnalysisPage() {
   const [location, setLocation] = useState("");
   const [error, setError] = useState("");
   const [generatedAt, setGeneratedAt] = useState("");
+  const [realCategories, setRealCategories] = useState<string[]>([]);
+
+  // Fetch real categories from inventory + products table
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data: inv } = await (await import("@/lib/supabase")).supabase
+        .from("inventory").select("category").eq("store_id", user.id);
+      const { data: prods } = await (await import("@/lib/supabase")).supabase
+        .from("products").select("category");
+      const cats = new Set<string>();
+      inv?.forEach(i => { if (i.category) cats.add(i.category); });
+      prods?.forEach(p => { if (p.category) cats.add(p.category); });
+      setRealCategories([...cats].sort());
+    })();
+  }, [user]);
+
+  const CATEGORIES = realCategories.length > 0 ? realCategories : DEFAULT_CATEGORIES;
 
   useEffect(() => {
     (async () => {

@@ -34,6 +34,17 @@ export async function POST(request: Request) {
       }
     }
 
+    // Validate category exists in inventory, products, or historic_sales
+    if (category) {
+      const { data: invCat } = await supabase.from("inventory").select("id").eq("store_id", userId).ilike("category", `%${category}%`).limit(1);
+      const { data: prodCat } = await supabase.from("products").select("product_id").ilike("category", `%${category}%`).limit(1);
+      const { data: salesCat } = await supabase.from("historic_sales").select("product_name").ilike("category", `%${category}%`).limit(1);
+
+      if (!invCat?.length && !prodCat?.length && !salesCat?.length) {
+        return Response.json({ error: `"${category}" is not a valid category. Please search for a category that exists in your inventory.` }, { status: 400 });
+      }
+    }
+
     // Store profile
     const { data: store } = await supabase
       .from("profiles").select("store_name, store_category, store_size, city, state, store_address")
