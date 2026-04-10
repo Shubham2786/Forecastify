@@ -39,10 +39,31 @@ export async function POST(request: Request) {
       .select("event_name, start_date, demand_impact_percent, affected_categories")
       .gte("start_date", today).lte("start_date", next14.toISOString().split("T")[0]);
 
-    // Build product list for Groq
-    const productList = inventory.map(p =>
-      `${p.product_name}|${p.category}|current_stock:${p.current_stock}${p.unit}|₹${p.price}`
-    ).join("\n");
+    // Fetch historic sales for actual daily demand per product
+    const last14 = new Date(); last14.setDate(last14.getDate() - 14);
+    const { data: historicSales } = await supabase
+      .from("historic_sales")
+      .select("product_name, quantity_sold, date")
+      .eq("city", store?.city || "")
+      .gte("date", last14.toISOString().split("T")[0]);
+
+    // Calculate avg daily demand per product from historic data
+    const demandMap: Record<string, { total: number; days: number }> = {};
+    historicSales?.forEach(s => {
+      const key = s.product_name?.toLowerCase();
+      if (!key) return;
+      if (!demandMap[key]) demandMap[key] = { total: 0, days: 0 };
+      demandMap[key].total += s.quantity_sold;
+      demandMap[key].days++;
+    });
+
+    // Build product list with actual demand if available
+    const productList = inventory.map(p => {
+      const key = p.product_name?.toLowerCase();
+      const hist = demandMap[key];
+      const avgDaily = hist && hist.days > 0 ? Math.round((hist.total / hist.days) * 10) / 10 : null;
+      return `${p.product_name}|${p.category}|stock:${p.current_stock}${p.unit}|₹${p.price}${avgDaily !== null ? `|avg_daily_sold:${avgDaily}` : ""}`;
+    }).join("\n");
 
     const eventsStr = events?.length
       ? events.map(e => `${e.event_name}(${e.start_date}) +${e.demand_impact_percent}% on ${e.affected_categories?.join(",")}`).join("; ")
@@ -58,13 +79,13 @@ INVENTORY:
 ${productList}
 
 RULES:
-- Estimate daily demand from product type and category (HIGH >10/day, MEDIUM 3-10/day, LOW <3/day)
-- CRITICAL: current_stock < estimated_daily_demand × 3 (less than 3 days left)
-- WARNING: current_stock < estimated_daily_demand × 7 (less than 7 days left)
-- INFO overstock: current_stock > estimated_daily_demand × 30 (more than 30 days supply)
+- Use avg_daily_sold from historic data if available, otherwise estimate from product type
+- CRITICAL: stock < daily_demand × 3 (less than 3 days left)
+- WARNING: stock < daily_demand × 7 (less than 7 days left)
+- INFO overstock: stock > daily_demand × 30 (more than 30 days supply)
 - Also flag products where upcoming events will spike demand beyond current stock
-- days until stockout = current_stock / estimated daily demand
-- suggestedRestock = (14 × dailyDemand) - current_stock + 20% buffer
+- daysUntilStockout = stock / daily_demand
+- suggestedRestock = (14 × dailyDemand) - stock + 20% buffer
 
 Return JSON array ONLY:
 [

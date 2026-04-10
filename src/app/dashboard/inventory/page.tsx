@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, Search, TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2, ArrowUpDown, Loader2 } from "lucide-react";
+import { Package, Search, AlertTriangle, CheckCircle2, ArrowUpDown, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type Status = "critical" | "low" | "optimal" | "overstock";
@@ -25,7 +25,7 @@ function transformItem(row: any): InventoryItem {
   // Status based on AI-driven daily demand from historic sales
   // critical: < 3 days supply, low: < 7 days, overstock: > 30 days
   const dailyDemand = Math.max(1, Math.round(currentStock / 14));
-  const daysOfStock = dailyDemand > 0 ? parseFloat((currentStock / dailyDemand).toFixed(1)) : 0;
+  const daysOfStock = dailyDemand > 0 ? Math.round(currentStock / dailyDemand) : 0;
 
   let status: Status = "optimal";
   if (currentStock <= 5) status = "critical";
@@ -155,7 +155,7 @@ export default function InventoryPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border bg-secondary/50">
-                {["Product", "Category", "Current Stock", "Recommended", "Daily Demand", "Days Left", "Trend", "Status"].map((h) => (
+                {["Product", "Category", "Current Stock", "Recommended", "Daily Demand", "Days Left", "Status"].map((h) => (
                   <th key={h} className={`text-xs font-semibold text-muted-foreground uppercase px-5 py-3 ${["Current Stock", "Recommended", "Daily Demand", "Days Left"].includes(h) ? "text-right" : ["Trend", "Status"].includes(h) ? "text-center" : "text-left"}`}>{h}</th>
                 ))}
               </tr>
@@ -177,9 +177,6 @@ export default function InventoryPage() {
                     <td className="px-5 py-4 text-right text-sm text-muted-foreground">{item.recommendedStock}</td>
                     <td className="px-5 py-4 text-right text-sm text-card-foreground font-medium">{item.dailyDemand}</td>
                     <td className="px-5 py-4 text-right"><span className={`text-sm font-bold ${item.daysOfStock <= 2 ? "text-danger" : item.daysOfStock <= 4 ? "text-warning" : "text-card-foreground"}`}>{item.daysOfStock}</span></td>
-                    <td className="px-5 py-4 text-center">
-                      {item.trend === "rising" ? <TrendingUp className="w-4 h-4 text-success mx-auto" /> : item.trend === "falling" ? <TrendingDown className="w-4 h-4 text-danger mx-auto" /> : <Minus className="w-4 h-4 text-muted-foreground mx-auto" />}
-                    </td>
                     <td className="px-5 py-4 text-center"><span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${config.color}`}>{config.label}</span></td>
                   </tr>
                 );

@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       const unitsSelledBeforeExpiry = Math.round(dailyDemand * effectiveDays * 100) / 100;
 
       // Calculate waste
-      const quantity = item.quantity || 0;
+      const quantity = item.current_stock || 0;
       const wasteUnits = Math.max(0, quantity - unitsSelledBeforeExpiry);
       const wastePercentage = quantity > 0 ? Math.round((wasteUnits / quantity) * 100 * 10) / 10 : 0;
 

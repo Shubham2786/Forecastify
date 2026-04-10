@@ -311,7 +311,7 @@ export default function ExpiryRiskPage() {
                     >
                       <td className="px-4 py-3 font-medium">{product.productName}</td>
                       <td className="px-4 py-3 text-muted-foreground">{product.category}</td>
-                      <td className="px-4 py-3 text-right">{product.quantity}</td>
+                      <td className="px-4 py-3 text-right">{product.quantity} {product.unit || "pcs"}</td>
                       <td className="px-4 py-3">{formatDate(product.expiryDate)}</td>
                       <td className="px-4 py-3 text-right">
                         <span className={colors.text}>
