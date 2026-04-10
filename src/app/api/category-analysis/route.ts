@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
     // My inventory summary
     const myInvStr = myProducts?.length
-      ? myProducts.map(p => `${p.product_name}|qty:${p.quantity}${p.unit}|₹${p.price}|brand:${p.brand || "?"}`).join("\n")
+      ? myProducts.map(p => `${p.product_name}|stock:${p.current_stock}${p.unit}|₹${p.price}|brand:${p.brand || "?"}`).join("\n")
       : "No products in this category yet.";
 
     // Upcoming events

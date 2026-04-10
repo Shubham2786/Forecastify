@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
     // Fetch inventory
     const { data: inventory } = await supabase
-      .from("inventory").select("*").eq("store_id", userId).order("quantity", { ascending: true });
+      .from("inventory").select("*").eq("store_id", userId).order("current_stock", { ascending: true });
 
     if (!inventory?.length) {
       return Response.json({ alerts: [], summary: { critical: 0, warning: 0, info: 0 } });
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     // Build product list for Groq
     const productList = inventory.map(p =>
-      `${p.product_name}|${p.category}|qty:${p.quantity}${p.unit}|min:${p.min_stock}|max:${p.max_stock}|₹${p.price}`
+      `${p.product_name}|${p.category}|current_stock:${p.current_stock}${p.unit}|₹${p.price}`
     ).join("\n");
 
     const eventsStr = events?.length
@@ -58,13 +58,13 @@ INVENTORY:
 ${productList}
 
 RULES:
-- If quantity <= min_stock × 0.5 → CRITICAL stockout risk
-- If quantity <= min_stock → WARNING low stock
-- If quantity >= max_stock × 0.9 → INFO overstock
+- Estimate daily demand from product type and category (HIGH >10/day, MEDIUM 3-10/day, LOW <3/day)
+- CRITICAL: current_stock < estimated_daily_demand × 3 (less than 3 days left)
+- WARNING: current_stock < estimated_daily_demand × 7 (less than 7 days left)
+- INFO overstock: current_stock > estimated_daily_demand × 30 (more than 30 days supply)
 - Also flag products where upcoming events will spike demand beyond current stock
-- For each alert estimate: days until stockout = quantity / estimated daily demand
-- Demand categories: HIGH (>10/day), MEDIUM (3-10/day), LOW (<3/day) — based on product type
-- suggestedRestock = (7 × dailyDemand) - currentQuantity + 20% buffer
+- days until stockout = current_stock / estimated daily demand
+- suggestedRestock = (14 × dailyDemand) - current_stock + 20% buffer
 
 Return JSON array ONLY:
 [
@@ -73,8 +73,6 @@ Return JSON array ONLY:
     "category": "Category",
     "currentStock": 10,
     "unit": "pcs",
-    "minStock": 20,
-    "maxStock": 100,
     "severity": "critical/warning/info",
     "alertType": "stockout/low_stock/overstock/demand_spike",
     "title": "Short alert title",

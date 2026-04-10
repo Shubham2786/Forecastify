@@ -26,23 +26,34 @@ export async function POST(request: Request) {
     };
     const storeRegion = stateToRegion[storeState] || "West";
 
+    // Match user to stores table (PDF-required table)
+    const { data: matchedStore } = await supabase.from("stores")
+      .select("store_id, store_name, city, state, store_type, store_size_sqft")
+      .ilike("city", city).limit(1).maybeSingle();
+    const storeId = matchedStore?.store_id || 1;
+
     // 1. Full inventory
     const { data: inventory } = await supabase.from("inventory")
-      .select("id, product_name, category, quantity, unit, price, min_stock, max_stock, brand, created_at")
+      .select("id, product_name, category, current_stock, unit, price, brand, created_at")
       .eq("store_id", userId).order("created_at", { ascending: false });
 
     const totalSKUs = inventory?.length || 0;
-    const criticalItems = inventory?.filter(i => i.quantity <= (i.min_stock || 10) * 0.5).length || 0;
-    const lowItems = inventory?.filter(i => i.quantity <= (i.min_stock || 10)).length || 0;
-    const overstockItems = inventory?.filter(i => i.quantity >= (i.max_stock || 1000) * 0.9).length || 0;
-    const totalValue = inventory?.reduce((s, i) => s + (i.quantity * i.price), 0) || 0;
+    // Use historic sales avg daily demand to determine status — no min/max needed
+    // critical: current_stock < avg_daily_demand * 3
+    // low:      current_stock < avg_daily_demand * 7
+    // overstock: current_stock > avg_daily_demand * 30
+    // For now use quantity-based heuristic until forecast data is available
+    const criticalItems = inventory?.filter(i => i.current_stock <= 5).length || 0;
+    const lowItems = inventory?.filter(i => i.current_stock > 5 && i.current_stock <= 15).length || 0;
+    const overstockItems = inventory?.filter(i => i.current_stock >= 150).length || 0;
+    const totalValue = inventory?.reduce((s, i) => s + (i.current_stock * i.price), 0) || 0;
 
     // Category demand
     const catMap: Record<string, { stock: number; value: number; count: number }> = {};
     inventory?.forEach(i => {
       if (!catMap[i.category]) catMap[i.category] = { stock: 0, value: 0, count: 0 };
-      catMap[i.category].stock += i.quantity;
-      catMap[i.category].value += i.quantity * i.price;
+      catMap[i.category].stock += i.current_stock;
+      catMap[i.category].value += i.current_stock * i.price;
       catMap[i.category].count++;
     });
     const categoryDemand = Object.entries(catMap)
@@ -51,21 +62,21 @@ export async function POST(request: Request) {
 
     // 2. Recent products
     const recentProducts = (inventory || []).slice(0, 10).map(i => ({
-      name: i.product_name, category: i.category, quantity: i.quantity, unit: i.unit,
+      name: i.product_name, category: i.category, quantity: i.current_stock, unit: i.unit,
       price: i.price, brand: i.brand,
-      status: i.quantity <= (i.min_stock || 10) * 0.5 ? "critical"
-        : i.quantity <= (i.min_stock || 10) ? "low"
-        : i.quantity >= (i.max_stock || 1000) * 0.9 ? "overstock" : "optimal",
+      status: i.current_stock <= 5 ? "critical"
+        : i.current_stock <= 15 ? "low"
+        : i.current_stock >= 150 ? "overstock" : "optimal",
     }));
 
     // 3. Inventory sorted views
-    const byLowQty = [...(inventory || [])].sort((a, b) => a.quantity - b.quantity).slice(0, 10).map(i => ({
-      name: i.product_name, category: i.category, quantity: i.quantity, unit: i.unit, price: i.price,
-      status: i.quantity <= (i.min_stock || 10) * 0.5 ? "critical" : i.quantity <= (i.min_stock || 10) ? "low" : "ok",
+    const byLowQty = [...(inventory || [])].sort((a, b) => a.current_stock - b.current_stock).slice(0, 10).map(i => ({
+      name: i.product_name, category: i.category, quantity: i.current_stock, unit: i.unit, price: i.price,
+      status: i.current_stock <= 5 ? "critical" : i.current_stock <= 15 ? "low" : "ok",
     }));
-    const byHighPrice = [...(inventory || [])].sort((a, b) => (b.quantity * b.price) - (a.quantity * a.price)).slice(0, 10).map(i => ({
-      name: i.product_name, category: i.category, quantity: i.quantity, unit: i.unit, price: i.price,
-      totalValue: Math.round(i.quantity * i.price),
+    const byHighPrice = [...(inventory || [])].sort((a, b) => (b.current_stock * b.price) - (a.current_stock * a.price)).slice(0, 10).map(i => ({
+      name: i.product_name, category: i.category, quantity: i.current_stock, unit: i.unit, price: i.price,
+      totalValue: Math.round(i.current_stock * i.price),
     }));
 
     // 4. Demand forecast (next 7 days)
@@ -74,7 +85,7 @@ export async function POST(request: Request) {
     const next7end = new Date(now); next7end.setDate(next7end.getDate() + 7);
     const { data: forecasts } = await supabase.from("demand_forecast")
       .select("date, product_id, predicted_units_sold, recommended_inventory_level, confidence")
-      .eq("store_id", 1).gte("date", today).lte("date", next7end.toISOString().split("T")[0]);
+      .eq("store_id", storeId).gte("date", today).lte("date", next7end.toISOString().split("T")[0]);
 
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dayNamesFull = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -119,10 +130,10 @@ export async function POST(request: Request) {
         return {
           name: p?.product_name || `Product #${pid}`, category: p?.category || "?",
           brand: p?.brand || "?", weeklyDemand: Math.round(demand), dailyDemand: dailyD,
-          currentStock: inv?.quantity || 0, unit: inv?.unit || "pcs",
-          daysOfStock: dailyD > 0 ? Math.round((inv?.quantity || 0) / dailyD) : 0,
+          currentStock: inv?.current_stock || 0, unit: inv?.unit || "pcs",
+          daysOfStock: dailyD > 0 ? Math.round((inv?.current_stock || 0) / dailyD) : 0,
           price: p?.mrp || inv?.price || 0,
-          gap: inv ? Math.round(demand * 1.2) - inv.quantity : Math.round(demand * 1.2),
+          gap: inv ? Math.round(demand * 1.2) - inv.current_stock : Math.round(demand * 1.2),
         };
       });
 
@@ -255,11 +266,11 @@ export async function POST(request: Request) {
     // Stockout risk: products where stock / daily_demand < 3 days
     const stockoutProducts = (inventory || []).map(i => {
       const forecastDemand = dailyDemandByProduct[i.product_name.toLowerCase()] || 0;
-      const dailyDemand = forecastDemand > 0 ? forecastDemand : Math.max(1, Math.round(i.quantity / 14));
-      const daysLeft = dailyDemand > 0 ? Math.round(i.quantity / dailyDemand) : 999;
+      const dailyDemand = forecastDemand > 0 ? forecastDemand : Math.max(1, Math.round(i.current_stock / 14));
+      const daysLeft = dailyDemand > 0 ? Math.round(i.current_stock / dailyDemand) : 999;
       const probability = daysLeft <= 1 ? 95 : daysLeft <= 2 ? 80 : daysLeft <= 3 ? 60 : daysLeft <= 5 ? 30 : 5;
       return {
-        name: i.product_name, category: i.category, currentStock: i.quantity, unit: i.unit,
+        name: i.product_name, category: i.category, currentStock: i.current_stock, unit: i.unit,
         dailyDemand, daysLeft, probability, price: i.price,
         risk: probability >= 70 ? "high" : probability >= 40 ? "medium" : "low",
       };
@@ -314,6 +325,21 @@ export async function POST(request: Request) {
     const avgConfidence = forecasts?.length
       ? Math.round((forecasts.reduce((s, f) => s + (f.confidence || 0.75), 0) / forecasts.length) * 100) : 78;
 
+    // Weather data from database (weather_history table — PDF's "weather" table)
+    const last7W = new Date(now); last7W.setDate(last7W.getDate() - 7);
+    const { data: dbWeatherData } = await supabase.from("weather_history")
+      .select("date, avg_temp, max_temp, min_temp, humidity, weather_condition, rainfall_mm")
+      .eq("city", city).gte("date", last7W.toISOString().split("T")[0])
+      .order("date", { ascending: false }).limit(7);
+
+    // Test inputs — records the system must predict (test_input table)
+    const { data: testInputs } = await supabase.from("test_input")
+      .select("date, store_id, product_id")
+      .eq("store_id", storeId).gte("date", today).order("date");
+    const testFulfilled = testInputs?.filter(ti =>
+      forecasts?.some(f => f.date === ti.date && f.product_id === ti.product_id)
+    ).length || 0;
+
     return Response.json({
       store,
       stats: {
@@ -341,6 +367,10 @@ export async function POST(request: Request) {
       realtimeSignals,
       stockoutProducts: stockoutProducts.slice(0, 15),
       volatilityProducts: volatilityProducts.slice(0, 15),
+      matchedStore: matchedStore || null,
+      storeId,
+      dbWeather: dbWeatherData || [],
+      testInputs: { total: testInputs?.length || 0, fulfilled: testFulfilled, pending: (testInputs?.length || 0) - testFulfilled },
       generatedAt: new Date().toISOString(),
     });
   } catch (err: any) {

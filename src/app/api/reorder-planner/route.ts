@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     // Get inventory for this store
     const { data: inventory } = await supabase
       .from("inventory")
-      .select("id, product_name, category, quantity, unit, price, min_stock, max_stock, brand")
+      .select("id, product_name, category, current_stock, unit, price, brand")
       .eq("store_id", userId);
 
     if (!inventory?.length) {
@@ -89,13 +89,13 @@ export async function POST(request: Request) {
         const total = historicMap[item.product_name].reduce((a: number, b: number) => a + b, 0);
         dailyDemand = total / historicMap[item.product_name].length;
       } else {
-        dailyDemand = Math.max(1, Math.round(item.quantity * 0.05)); // fallback
+        dailyDemand = Math.max(1, Math.round(item.current_stock * 0.05)); // fallback
       }
 
       const leadTimeDays = leadTimeMap[item.product_name] || 3;
       const safetyStock = dailyDemand * 2;
       const reorderPoint = (dailyDemand * leadTimeDays) + safetyStock;
-      const currentStock = item.quantity || 0;
+      const currentStock = item.current_stock || 0;
       const needsReorder = currentStock <= reorderPoint;
       const daysUntilReorder = needsReorder ? 0 : Math.round((currentStock - reorderPoint) / dailyDemand);
 

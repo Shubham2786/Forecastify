@@ -6,21 +6,17 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-function calcStockLevelScore(quantity: number, minStock: number | null, maxStock: number | null): number {
-  const min = minStock ?? 0;
-  const max = maxStock ?? Infinity;
-  if (min === 0 && max === Infinity) return 15; // unknown range, neutral
-  if (quantity >= min && quantity <= max) return 25;
-  if (quantity === 0) return 0; // critical stockout
-  if (quantity < min) {
-    const ratio = quantity / min;
-    return Math.round(ratio * 20);
-  }
-  // overstock
-  if (max === Infinity) return 20;
-  const overRatio = (quantity - max) / max;
-  if (overRatio > 1) return 0; // severe overstock (2x max)
-  return Math.round(25 - overRatio * 25);
+function calcStockLevelScore(currentStock: number, avgDailyDemand: number): number {
+  if (avgDailyDemand === 0) return 15;
+  const daysLeft = currentStock / avgDailyDemand;
+  if (daysLeft >= 7 && daysLeft <= 21) return 25;  // ideal range
+  if (currentStock === 0) return 0;
+  if (daysLeft < 3) return Math.round((daysLeft / 3) * 10);
+  if (daysLeft < 7) return Math.round(10 + (daysLeft - 3) / 4 * 15);
+  // overstock > 30 days
+  if (daysLeft > 60) return 0;
+  if (daysLeft > 30) return Math.round(25 - ((daysLeft - 21) / 39) * 25);
+  return 20;
 }
 
 function calcDemandAlignmentScore(quantity: number, totalDemand7d: number): number {
@@ -48,26 +44,22 @@ function calcVolatilityScore(salesValues: number[]): number {
   return Math.round(25 - ((cv - 10) / 40) * 25);
 }
 
-function calcTrendScore(last7Avg: number, prior7Avg: number, quantity: number, minStock: number | null, maxStock: number | null): number {
-  const min = minStock ?? 0;
-  const max = maxStock ?? Infinity;
+function calcTrendScore(last7Avg: number, prior7Avg: number, currentStock: number): number {
   if (prior7Avg === 0 && last7Avg === 0) return 15;
   const trendRatio = prior7Avg === 0 ? 1.5 : last7Avg / prior7Avg;
-
-  // Growing demand
+  const daysLeft = last7Avg > 0 ? currentStock / last7Avg : 999;
   if (trendRatio > 1.1) {
-    if (quantity < min) return 5; // growing demand + low stock = bad
-    if (quantity >= min) return 25;
-    return 15;
+    // growing demand
+    if (daysLeft < 3) return 5;
+    return 25;
   }
-  // Declining demand
   if (trendRatio < 0.9) {
-    if (max !== Infinity && quantity > max) return 5; // declining + overstock = bad
-    if (quantity <= (max === Infinity ? quantity : max)) return 20;
-    return 10;
+    // declining demand
+    if (daysLeft > 30) return 5; // declining + overstock
+    return 20;
   }
-  // Stable
-  if (quantity >= min && (max === Infinity || quantity <= max)) return 25;
+  // stable
+  if (daysLeft >= 7 && daysLeft <= 21) return 25;
   return 18;
 }
 
@@ -95,7 +87,7 @@ export async function POST(request: Request) {
     // 2. Inventory
     const { data: inventory } = await supabase
       .from("inventory")
-      .select("product_name, category, quantity, unit, price, min_stock, max_stock")
+      .select("product_name, category, current_stock, unit, price")
       .eq("store_id", userId);
 
     if (!inventory?.length) {
@@ -177,10 +169,11 @@ export async function POST(request: Request) {
       const last7Avg = hist.last7.length > 0 ? hist.last7.reduce((a, b) => a + b, 0) / hist.last7.length : 0;
       const prior7Avg = hist.prior7.length > 0 ? hist.prior7.reduce((a, b) => a + b, 0) / hist.prior7.length : 0;
 
-      const stockScore = calcStockLevelScore(item.quantity, item.min_stock, item.max_stock);
-      const demandScore = calcDemandAlignmentScore(item.quantity, totalDemand7d);
+      const avgDailyDemand = totalDemand7d > 0 ? totalDemand7d / 7 : (last7Avg || 1);
+      const stockScore = calcStockLevelScore(item.current_stock, avgDailyDemand);
+      const demandScore = calcDemandAlignmentScore(item.current_stock, totalDemand7d);
       const volatilityScore = calcVolatilityScore(allSales);
-      const trendScore = calcTrendScore(last7Avg, prior7Avg, item.quantity, item.min_stock, item.max_stock);
+      const trendScore = calcTrendScore(last7Avg, prior7Avg, item.current_stock);
 
       const healthScore = Math.round(((stockScore + demandScore + volatilityScore + trendScore) / 100) * 100);
       const grade = getGrade(healthScore);
@@ -198,7 +191,7 @@ export async function POST(request: Request) {
       productResults.push({
         productName: item.product_name,
         category: cat,
-        quantity: item.quantity,
+        quantity: item.current_stock,
         healthScore,
         stockLevel: stockScore,
         demandAlignment: demandScore,

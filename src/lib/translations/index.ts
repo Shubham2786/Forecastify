@@ -21,7 +21,7 @@ const mr = makeLang({
   "chart.forecastTitle": "पुढील 7 दिवसांचा अंदाज (एकूण {{count}} प्रॉडक्ट)",
   "chart.categoryTitle": "कॅटेगरी प्रमाणे स्टॉक",
   "table.productInsights": "प्रॉडक्ट तपशील", "table.topDemand": "सर्वाधिक विकले जाणारे",
-  "table.lowStock": "कमी स्टॉक", "table.highValue": "महाग स्टॉक", "table.recent": "नवीन प्रॉडक्ट",
+  "table.lowStock": "कमी स्टॉक", "table.highValue": "महाग स्टॉक", "table.recentlyAdded": "नुकतेच जोडलेले",
   "status.critical": "संपले!", "status.low": "कमी आहे", "status.overstock": "खूप जास्त", "status.optimal": "योग्य",
   "biz.weatherTitle": "हवामानाचा परिणाम", "biz.promoTitle": "ऑफरचा परिणाम",
   "biz.eventsTitle": "येणारे सण", "biz.patternsTitle": "विक्रीचा पॅटर्न",

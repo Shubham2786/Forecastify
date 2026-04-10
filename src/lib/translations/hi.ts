@@ -24,7 +24,7 @@ const hi: Record<string, string> = {
   "chart.units": "यूनिट",
 
   "table.productInsights": "प्रोडक्ट की डिटेल", "table.topDemand": "सबसे ज्यादा बिकने वाले",
-  "table.lowStock": "कम स्टॉक", "table.highValue": "सबसे महंगा स्टॉक", "table.recent": "नए प्रोडक्ट",
+  "table.lowStock": "कम स्टॉक", "table.highValue": "सबसे महंगा स्टॉक", "table.recentlyAdded": "हाल में जोड़े",
   "table.product": "प्रोडक्ट", "table.category": "कैटेगरी", "table.dailyDemand": "रोज़ाना डिमांड",
   "table.weekly": "हफ्ते भर", "table.stock": "स्टॉक", "table.daysLeft": "कितने दिन चलेगा",
   "table.needed": "और चाहिए", "table.qty": "मात्रा", "table.price": "कीमत", "table.status": "स्टेटस",

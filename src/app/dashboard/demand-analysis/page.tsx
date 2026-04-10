@@ -173,7 +173,7 @@ export default function DemandAnalysisPage() {
       if (user) {
         const { data: invData } = await supabase
           .from("inventory")
-          .select("product_name, category, quantity, unit, price, min_stock, max_stock, sku, brand")
+          .select("product_name, category, current_stock, unit, price, sku, brand")
           .eq("store_id", user.id);
         inventoryItems = invData || [];
       }

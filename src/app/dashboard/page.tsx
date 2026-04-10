@@ -95,9 +95,12 @@ export default function DashboardPage() {
   const highValue = data?.inventoryByValue || [];
   const weatherImpact = data?.weatherImpact || [];
   const promoImpact = data?.promotionImpact || [];
+  const dbWeather = data?.dbWeather || [];
+  const matchedStore = data?.matchedStore;
+  const testInputInfo = data?.testInputs || { total: 0, fulfilled: 0, pending: 0 };
 
   const filterData: Record<FilterTab, any[]> = { topDemand, lowStock, highValue, recent: recentProducts };
-  const filterLabels: Record<FilterTab, string> = { topDemand: t("table.topDemand"), lowStock: t("table.lowStock"), highValue: t("table.highValue"), recent: t("table.recent") };
+  const filterLabels: Record<FilterTab, string> = { topDemand: t("table.topDemand"), lowStock: t("table.lowStock"), highValue: t("table.highValue"), recent: t("table.recentlyAdded") };
 
   const genTime = data?.generatedAt ? new Date(data.generatedAt) : new Date();
   const timeStr = genTime.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
@@ -197,7 +200,7 @@ ${events.length > 0 ? `<div class="section"><h2>Upcoming Events</h2>
   return (
     <div className="space-y-5">
       {/* Data source info */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground bg-secondary/50 rounded-lg px-4 py-2">
+      <div className="flex items-center justify-between text-xs text-muted-foreground bg-secondary/50 rounded-lg px-4 py-2 flex-wrap gap-1">
         <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Last updated: {timeStr}</span>
         <div className="flex items-center gap-3">
           <span>Data: {s.historicDataDays || 0} sales records from {s.dataSource || "your city"} | {s.forecastProductCount || 0} products forecasted</span>
@@ -475,6 +478,17 @@ ${events.length > 0 ? `<div class="section"><h2>Upcoming Events</h2>
               </div>
             </div>
           ) : <p className="text-sm text-muted-foreground">Loading...</p>}
+          {dbWeather.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-border">
+              <p className="text-[10px] font-semibold text-muted-foreground mb-1">📊 DB Weather (Last 7 days)</p>
+              {dbWeather.slice(0, 4).map((w: any, i: number) => (
+                <p key={i} className="text-[10px] flex justify-between text-muted-foreground">
+                  <span>{w.date?.slice(5)}</span>
+                  <span>{w.avg_temp}°C {w.weather_condition}{w.rainfall_mm > 0 ? ` 🌧${w.rainfall_mm}mm` : ""}</span>
+                </p>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Promotions */}
