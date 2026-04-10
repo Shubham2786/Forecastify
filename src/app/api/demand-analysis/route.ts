@@ -1,7 +1,13 @@
 import Groq from "groq-sdk";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const GROQ_KEYS = [
-
+  process.env.GROQ_API_KEY!,
   process.env.GROQ_API_KEY_2!,
   process.env.GROQ_API_KEY_3!,
 ].filter(Boolean);
@@ -9,18 +15,41 @@ const GROQ_KEYS = [
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { storeCategory, storeSize, city, state, weather, forecast, news, events, location, inventory, lang } = body;
+    const { storeCategory, storeSize, city, state, weather, forecast, news, location, inventory, promotions, lang } = body;
 
-    // Language mapping for Groq
     const langMap: Record<string, string> = { hi: "Hindi", mr: "Marathi", ta: "Tamil", te: "Telugu", kn: "Kannada", bn: "Bengali", gu: "Gujarati" };
-    const langInstruction = lang && langMap[lang] ? `\n\nIMPORTANT: Write ALL text fields (summary, reason, description, recommendations, message, mitigation) in ${langMap[lang]}. Keep product names, numbers, and JSON keys in English.` : "";
+    const langInstruction = lang && langMap[lang] ? `\n\nIMPORTANT: Write ALL text fields in ${langMap[lang]}. Keep product names, numbers, and JSON keys in English.` : "";
 
-    // Build compact inventory context for the AI
+    // Fetch regional_events from DB directly
+    const today = new Date().toISOString().split("T")[0];
+    const next14 = new Date(); next14.setDate(next14.getDate() + 14);
+    const [{ data: upcomingEvents }, { data: ongoingEvents }] = await Promise.all([
+      supabase.from("regional_events")
+        .select("event_name, start_date, end_date, demand_impact_percent, affected_categories, event_type, is_national")
+        .gte("start_date", today).lte("start_date", next14.toISOString().split("T")[0])
+        .order("start_date", { ascending: true }),
+      supabase.from("regional_events")
+        .select("event_name, start_date, end_date, demand_impact_percent, affected_categories, event_type, is_national")
+        .lte("start_date", today).gte("end_date", today),
+    ]);
+    const allDbEvents = [...(upcomingEvents || []), ...(ongoingEvents || [])];
+    const dbEventsStr = allDbEvents.length
+      ? allDbEvents.map((e: any) =>
+          `${e.event_name} | ${e.event_type} | ${e.start_date}→${e.end_date} | +${e.demand_impact_percent}% on [${e.affected_categories?.join(", ")}]${e.is_national ? " | NATIONAL" : ""}`
+        ).join("\n")
+      : "None";
+
     const inventoryContext = inventory?.length
       ? inventory.map((item: any) =>
           `${item.product_name} | ${item.category} | Stock: ${item.current_stock}${item.unit || "pcs"} | ₹${item.price}${item.brand ? ` | Brand: ${item.brand}` : ""}`
         ).join("\n")
       : "No inventory data available";
+
+    const promotionsContext = promotions?.length
+      ? promotions.map((p: any) =>
+          `${p.product_name}|${p.promo_type}|${p.discount_pct}% off|campaign:${p.campaign_name}|date:${p.date}${p.display_flag ? "|displayed in store" : ""}`
+        ).join("\n")
+      : "No active promotions";
 
     const prompt = `You are an AI retail demand forecasting expert for Indian retail stores. Analyze the following data and provide a comprehensive demand spike analysis.
 
@@ -41,26 +70,26 @@ ${forecast?.map((d: { date: string; avgTemp: number; weather: string; avgHumidit
 STORE'S CURRENT INVENTORY (${inventory?.length || 0} products):
 ${inventoryContext}
 
-LOCAL NEWS & OFFERS:
+ACTIVE PROMOTIONS (next 7 days):
+${promotionsContext}
+
+UPCOMING FESTIVALS & EVENTS (from database — with exact demand impact %):
+${dbEventsStr}
+
+LOCAL NEWS & MARKET TRENDS (live from Google):
 ${JSON.stringify(news?.offers?.slice(0, 3) || [], null, 2)}
 
 TRENDING IN CATEGORY:
 ${JSON.stringify(news?.trending?.slice(0, 3) || [], null, 2)}
 
-UPCOMING EVENTS/FESTIVALS:
-${JSON.stringify(news?.events?.slice(0, 3) || [], null, 2)}
-
 CRITICAL INSTRUCTIONS:
 - NEVER invent or hallucinate product names. For "demandSpikes.topProducts", "inventoryRecommendations", and "riskAlerts", you may ONLY use product names that appear EXACTLY in the STORE'S CURRENT INVENTORY list above.
-- If the inventory is empty or has few products, say so honestly. Do NOT make up products.
-- For "trendingProducts", you may include BOTH products from inventory AND market suggestions the store should consider stocking — but you MUST mark which is which using the "inInventory" field (true/false).
-- In the summary, reference only real inventory product names and their actual quantities.
-- NOT EVERY PRODUCT IS AFFECTED BY EVERY SPIKE. For each demand spike, think carefully about which SPECIFIC product categories are affected by that day's reason. For example:
-  * A heatwave day should spike beverages and cold items — NOT soap or cooking oil.
-  * A festival should spike sweets, snacks, and gifting items — NOT cleaning products.
-  * Only list 1-3 products per spike that are LOGICALLY connected to the reason. If no inventory products match that spike, leave topProducts as an EMPTY array [].
-- For each demand spike "reason", you MUST cite SPECIFIC data: mention the exact weather (e.g. "42°C heatwave"), exact festival/event names from the news, or exact trending topics. NEVER use vague reasons like "weekend approaching" or "people may stock up". Every reason must reference actual data from the weather/news/events provided above.
-- Some days may have LOW or ZERO spike probability — that is realistic. Do NOT force high spikes on every day.
+- For "upcomingOffers", use ONLY events from the UPCOMING FESTIVALS & EVENTS section above — use their exact demand_impact_percent values.
+- If a product has an ACTIVE PROMOTION, its demand will be higher — factor in 20-40% uplift per 10% discount.
+- For "trendingProducts", you may include BOTH products from inventory AND market suggestions — mark with "inInventory": true/false.
+- NOT EVERY PRODUCT IS AFFECTED BY EVERY SPIKE. Only list 1-3 products per spike that are LOGICALLY connected to the reason.
+- For each demand spike "reason", cite SPECIFIC data: exact weather, exact festival name from DB events, or exact trending topic. NEVER use vague reasons.
+- Some days may have LOW or ZERO spike probability — that is realistic.
 
 Based on ALL the above data, provide your analysis in the following JSON format ONLY (no markdown, no code blocks, just raw JSON):
 {
