@@ -5,6 +5,7 @@ pipeline {
     environment {
         SONARQUBE = credentials('sonar-token')
         SCANNER_HOME = tool 'SonarScanner'
+        BUCKET_NAME = 'trivy-logs-forcastify'
     }
 
     stages {
@@ -25,6 +26,30 @@ pipeline {
                     -Dsonar.host.url=http://13.234.152.9:9000 \
                     '''
                 }
+            }
+        }
+        stage('Trivy Security Scan') {
+            steps {
+                sh '''
+                trivy fs --severity HIGH,CRITICAL --skip-files .env --skip-files env.txt --exit-code 1 --no-progress .
+                '''
+            }
+        }
+
+        stage('Trivy Scan Report') {
+            steps {
+                sh '''
+                curl -sLO https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
+                trivy fs --format template --template "@html.tpl" -o trivy-report.html --skip-files .env --skip-files env.txt .
+                '''
+            }
+        }
+
+        stage('Upload to S3') {
+            steps {
+                sh '''
+                aws s3 cp trivy-report.html s3://$BUCKET_NAME/trivy-report-${BUILD_NUMBER}.html
+                '''
             }
         }
 
@@ -70,6 +95,9 @@ pipeline {
     }
 
     post {
+        always {
+            archiveArtifacts artifacts: 'trivy-report.html', fingerprint: true
+        }
         success {
             echo '✅ Pipeline completed successfully!'
         }
