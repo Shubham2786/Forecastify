@@ -18,6 +18,7 @@ interface RiskProduct {
   productName: string;
   category: string;
   quantity: number;
+  unit?: string;
   expiryDate: string;
   daysUntilExpiry: number;
   dailyDemand: number;
