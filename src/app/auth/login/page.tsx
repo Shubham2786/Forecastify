@@ -8,8 +8,8 @@ import { Eye, EyeOff, BarChart3, TrendingUp, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("doraemonboy288@gmail.com");
+  const [password, setPassword] = useState("Darshan@1");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
