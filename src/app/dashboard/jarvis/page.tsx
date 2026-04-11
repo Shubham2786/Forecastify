@@ -728,8 +728,25 @@ export default function JarvisPage() {
           setMicAllowed(false);
           setJarvisText("Microphone blocked. Click the lock icon in Chrome's address bar → allow Microphone → reload.");
         } else {
-          // "prompt" state — don't auto-request, wait for user gesture (click "Initialize Jarvis")
+          // "prompt" state — auto-initialize after 10 seconds if user hasn't clicked
           setMicAllowed(null);
+          setTimeout(() => {
+            if (cancelled || stateRef.current !== "sleeping") return;
+            // Trigger mic permission request + wake up
+            (async () => {
+              try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+                micStreamRef.current = stream;
+                setMicAllowed(true);
+                startRecognition();
+                unlockAudio();
+                sendToJarvis("Hey Jarvis, wake up.");
+              } catch {
+                setMicAllowed(false);
+              }
+            })();
+          }, 10000);
         }
 
         // Listen for permission changes (user toggles in browser settings)

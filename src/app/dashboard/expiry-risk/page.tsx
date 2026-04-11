@@ -29,6 +29,7 @@ interface RiskProduct {
   suggestedMarkdown: number;
   potentialLoss: number;
   price: number;
+  unit?: string;
 }
 
 interface Summary {
