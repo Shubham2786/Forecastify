@@ -1,5 +1,5 @@
 #stage 1 of the dockerfile
-FROM node:20-slim AS builder
+FROM public.ecr.aws/docker/library/node:20-slim AS builder
 
 WORKDIR /app
 
