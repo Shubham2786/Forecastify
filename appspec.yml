@@ -3,20 +3,24 @@ os: linux
 files:
   - source: /
     destination: /home/ec2-user/forecastify
+permissions:
+  - object: /home/ec2-user/forecastify
+    owner: ec2-user
+    group: ec2-user
+    mode: 0755
+    type:
+      - directory
+      - file
 hooks:
   BeforeInstall:
     - location: scripts/before_install.sh
       timeout: 300
-      runas: ec2-user
   AfterInstall:
     - location: scripts/after_install.sh
       timeout: 300
-      runas: ec2-user
   ApplicationStart:
     - location: scripts/application_start.sh
       timeout: 300
-      runas: ec2-user
   ApplicationStop:
     - location: scripts/application_stop.sh
       timeout: 300
-      runas: ec2-user
