@@ -2,21 +2,21 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /home/ubuntu/forecastify
+    destination: /home/ec2-user/forecastify
 hooks:
   BeforeInstall:
     - location: scripts/before_install.sh
       timeout: 300
-      runas: ubuntu
+      runas: ec2-user
   AfterInstall:
     - location: scripts/after_install.sh
       timeout: 300
-      runas: ubuntu
+      runas: ec2-user
   ApplicationStart:
     - location: scripts/application_start.sh
       timeout: 300
-      runas: ubuntu
+      runas: ec2-user
   ApplicationStop:
     - location: scripts/application_stop.sh
       timeout: 300
-      runas: ubuntu
+      runas: ec2-user

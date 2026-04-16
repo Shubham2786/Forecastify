@@ -1,4 +1,4 @@
 #!/bin/bash
 # script to start the application
-cd /home/ubuntu/forecastify
+cd /home/ec2-user/forecastify
 docker-compose up -d --build
