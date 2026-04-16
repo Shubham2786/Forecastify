@@ -30,14 +30,11 @@ phases:
       - echo "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> .env
       - npm run build
  
-<<<<<<< HEAD
-=======
   post_build:
     commands:
       - echo Setting script permissions...
       - chmod +x scripts/*.sh
-
->>>>>>> cicd
+ 
 artifacts:
   files:
     - '**/*'
