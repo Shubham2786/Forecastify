@@ -29,6 +29,11 @@ phases:
       - echo "SERPER_API_KEY=$SERPER_API_KEY" >> .env
       - echo "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> .env
       - npm run build
+ 
+  post_build:
+    commands:
+      - echo Setting script permissions...
+      - chmod +x scripts/*.sh
 
 artifacts:
   # include all files required to run the application
