@@ -1,5 +1,5 @@
 version: 0.2
-
+ 
 env:
   parameter-store:
     NEXT_PUBLIC_SUPABASE_URL: "/forecastify/dev/NEXT_PUBLIC_SUPABASE_URL"
@@ -10,13 +10,13 @@ env:
     GROQ_API_KEY_3: "/forecastify/dev/GROQ_API_KEY_3"
     SERPER_API_KEY: "/forecastify/dev/SERPER_API_KEY"
     GOOGLE_MAPS_API_KEY: "/forecastify/dev/GOOGLE_MAPS_API_KEY"
-
+ 
 phases:
   install:
     commands:
       - echo Installing...
       - npm install
-
+ 
   build:
     commands:
       - echo Creating .env
@@ -29,15 +29,7 @@ phases:
       - echo "SERPER_API_KEY=$SERPER_API_KEY" >> .env
       - echo "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> .env
       - npm run build
-
+ 
 artifacts:
-  # include all files required to run the application
   files:
-    - appspec.yml
-    - dist/**/*
-    - scripts/**/*
-  discard-paths: no
-    #- src/**/*
-    #- package.json
-    #- appspec.yml
-    #- scripts/**/*
+    - '**/*'
