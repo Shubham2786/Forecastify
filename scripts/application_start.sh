@@ -6,5 +6,5 @@ aws ecr get-login-password --region eu-west-1 | docker login --username AWS --pa
 
 docker pull 360121241545.dkr.ecr.eu-west-1.amazonaws.com/forecastify:latest
 
-docker compose down || true
-docker compose up -d
+docker-compose down || true
+docker-compose up -d
