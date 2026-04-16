@@ -1,6 +1,5 @@
 services:
   forecastify:
-    build: .
     image: forecastify:latest
     ports:
       - "3000:3000"
