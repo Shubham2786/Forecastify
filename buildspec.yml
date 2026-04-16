@@ -1,0 +1,35 @@
+version: 0.2
+
+env:
+  parameter-store:
+    NEXT_PUBLIC_SUPABASE_URL: "/forecastify/dev/NEXT_PUBLIC_SUPABASE_URL"
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: "/forecastify/dev/NEXT_PUBLIC_SUPABASE_ANON_KEY"
+    OPENWEATHER_API_KEY: "/forecastify/dev/OPENWEATHER_API_KEY"
+    GROQ_API_KEY: "/forecastify/dev/GROQ_API_KEY"
+    GROQ_API_KEY_2: "/forecastify/dev/GROQ_API_KEY_2"
+    GROQ_API_KEY_3: "/forecastify/dev/GROQ_API_KEY_3"
+    SERPER_API_KEY: "/forecastify/dev/SERPER_API_KEY"
+    GOOGLE_MAPS_API_KEY: "/forecastify/dev/GOOGLE_MAPS_API_KEY"
+
+phases:
+  install:
+    commands:
+      - echo Installing...
+      - npm install
+
+  build:
+    commands:
+      - echo Creating .env
+      - echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL" >> .env
+      - echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY" >> .env
+      - echo "OPENWEATHER_API_KEY=$OPENWEATHER_API_KEY" >> .env
+      - echo "GROQ_API_KEY=$GROQ_API_KEY" >> .env
+      - echo "GROQ_API_KEY_2=$GROQ_API_KEY_2" >> .env
+      - echo "GROQ_API_KEY_3=$GROQ_API_KEY_3" >> .env
+      - echo "SERPER_API_KEY=$SERPER_API_KEY" >> .env
+      - echo "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> .env
+      - npm run build
+
+artifacts:
+  files:
+    - '**/*'
