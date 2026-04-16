@@ -1,6 +1,7 @@
 services:
   forecastify:
-    image: ashok28072005/forecastify:latest
+    build: .
+    image: forecastify:latest
     ports:
       - "3000:3000"
     env_file:
