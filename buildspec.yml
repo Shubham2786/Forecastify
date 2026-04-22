@@ -19,8 +19,14 @@ phases:
 
   pre_build:
     commands:
+      - echo Getting account ID...
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
       - echo Logging into ECR...
-      - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 360121241545.dkr.ecr.eu-west-1.amazonaws.com
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+      - REPO_NAME=forecastify-dev-repo
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
 
   build:
     commands:
@@ -38,15 +44,17 @@ phases:
       - npm run build
 
       - echo Building Docker image...
-      - docker build -t forecastify:latest .
+      - docker build -t forecastify:$IMAGE_TAG .
 
-      - echo Tagging image for ECR...
-      - docker tag forecastify:latest 360121241545.dkr.ecr.eu-west-1.amazonaws.com/forecastify:latest
+      - echo Tagging Docker image...
+      - docker tag forecastify:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:$IMAGE_TAG
+      - docker tag forecastify:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:latest
 
   post_build:
     commands:
-      - echo Pushing image to ECR...
-      - docker push 360121241545.dkr.ecr.eu-west-1.amazonaws.com/forecastify:latest
+      - echo Pushing Docker image...
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:$IMAGE_TAG
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:latest
 
       - echo Setting script permissions...
       - chmod +x scripts/*.sh

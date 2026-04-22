@@ -13,6 +13,7 @@
 # testing
 /coverage
 
+/IaC/*
 # next.js
 /.next/
 /out/
