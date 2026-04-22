@@ -15,7 +15,7 @@ aws ssm get-parameters-by-path \
 done
 
 # Login + pull + run
-aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 950110265938.dkr.ecr.eu-west-1.amazonaws.com
-docker pull 950110265938.dkr.ecr.eu-west-1.amazonaws.com/forecastify-dev-repo:latest
+aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 360121241545.dkr.ecr.eu-west-1.amazonaws.com
+docker pull 360121241545.dkr.ecr.eu-west-1.amazonaws.com/forecastify-dev-repo:latest
 docker-compose down || true
 docker-compose up -d

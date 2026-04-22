@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   forecastify:
-    image: 950110265938.dkr.ecr.eu-west-1.amazonaws.com/forecastify-dev-repo:latest
+    image: 360121241545.dkr.ecr.eu-west-1.amazonaws.com/forecastify-dev-repo:latest
     ports:
       - "3000:3000"
     environment:
