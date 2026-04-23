@@ -13,6 +13,8 @@ env:
 
 phases:
   install:
+    runtime-versions:
+      nodejs: 20
     commands:
       - echo Installing dependencies...
       - npm install
@@ -40,8 +42,8 @@ phases:
       - echo "SERPER_API_KEY=$SERPER_API_KEY" >> .env
       - echo "GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" >> .env
 
-      - echo Building Next.js app...
-      - npm run build
+      # - echo Building Next.js app...
+      # - npm run build
 
       - echo Building Docker image...
       - docker build -t forecastify:$IMAGE_TAG .
