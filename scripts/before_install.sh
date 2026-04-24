@@ -9,7 +9,7 @@ echo "Starting before_install..."
 echo "Logging into ECR..."
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region)
+REGION="eu-west-1"
 
 aws ecr get-login-password --region $REGION \
 | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
