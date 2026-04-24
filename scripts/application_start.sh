@@ -3,7 +3,20 @@ set -e
 
 cd /home/ec2-user/forecastify
 
+echo "Starting application_start..."
+
+# -----------------------------
+# 1. Set REGION (IMPORTANT)
+# -----------------------------
+REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+
+# -----------------------------
+# 2. Fetch parameters from SSM
+# -----------------------------
 echo "Fetching parameters from SSM..."
+
+rm -f .env   # prevent duplicates
+
 aws ssm get-parameters-by-path \
   --path "/forecastify/dev/" \
   --with-decryption \
@@ -14,8 +27,18 @@ aws ssm get-parameters-by-path \
     echo "$key=$value" >> .env
 done
 
-# Login + pull + run
-aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 360121241545.dkr.ecr.eu-west-1.amazonaws.com
-docker pull 360121241545.dkr.ecr.eu-west-1.amazonaws.com/forecastify-dev-repo:latest
+echo ".env file created"
+
+# -----------------------------
+# 3. Restart containers properly
+# -----------------------------
+echo "Stopping old containers..."
 docker-compose down || true
-docker-compose up -d
+
+echo "Pulling latest image..."
+docker-compose pull
+
+echo "Starting containers..."
+docker-compose up -d --force-recreate
+
+echo "Deployment completed successfully"

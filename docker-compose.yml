@@ -3,15 +3,12 @@ version: "3.8"
 services:
   forecastify:
     image: 360121241545.dkr.ecr.eu-west-1.amazonaws.com/forecastify-dev-repo:latest
+    pull_policy: always
+
     ports:
       - "3000:3000"
-    environment:
-      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
-      GROQ_API_KEY: ${GROQ_API_KEY}
-      GROQ_API_KEY_2: ${GROQ_API_KEY_2}
-      GROQ_API_KEY_3: ${GROQ_API_KEY_3}
-      SERPER_API_KEY: ${SERPER_API_KEY}
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+
+    env_file:
+      - .env   # ✅ CRITICAL FIX
+
     restart: unless-stopped
