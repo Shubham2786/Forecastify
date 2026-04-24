@@ -8,7 +8,7 @@ echo "Starting application_start..."
 # -----------------------------
 # 1. Set REGION (IMPORTANT)
 # -----------------------------
-REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+REGION="eu-west-1"
 
 # -----------------------------
 # 2. Fetch parameters from SSM
