@@ -4,7 +4,6 @@ services:
   forecastify:
     image: 360121241545.dkr.ecr.eu-west-1.amazonaws.com/forecastify-dev-repo:latest
     pull_policy: always
-
     ports:
       - "3000:3000"
 
